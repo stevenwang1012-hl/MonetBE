@@ -22,7 +22,7 @@ export const HostLayout = ({
     rooms: Room[],
     roomOccupancy: Record<string, boolean>,
     onAction: (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => void,
-    onToggleRoom: (num: string) => void,
+    onToggleRoom: (num: string, date: string) => void,
     onUpdateRoom: (room: Room) => void,
     onCreateRoom: (room: Room) => void,
     onDeleteRoom: (roomId: string) => void,

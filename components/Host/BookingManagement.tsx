@@ -7,7 +7,7 @@ export const BookingManagement = (props: {
     rooms: Room[];
     roomOccupancy: Record<string, boolean>;
     onAction: (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => void;
-    onToggleRoom: (num: string) => void;
+    onToggleRoom: (num: string, date: string) => void;
 }) => {
     return <HostDashboard {...props} />;
 };

@@ -1,0 +1,18 @@
+# Project: MonetBB
+
+## Tech Stack
+- Frontend: React + Vite + TypeScript
+- Styling: Tailwind CSS + Shadcn UI (in `components/ui`)
+- Backend: Supabase (PostgreSQL + Storage)
+
+## Coding Rules
+- **Always import used modules**: Check formatting and imports after every edit. Specifically check for React hooks like `useEffect`, `useState` before assuming they are imported.
+- **No `window.location.reload()`**: Update React state for UI refresh instead of reloading page to preserve session state.
+- **Supabase**: Use `supabase.ts` client. Check RLS policies when encountering permission errors.
+- **UI**: Use responsive design (mobile-first), follow `HostLayout` for host pages.
+
+## Error Prevention
+- Before finishing a task, verify:
+  1. Are all variables defined?
+  2. Are all hooks (useEffect, useState) imported?
+  3. Does the code build?

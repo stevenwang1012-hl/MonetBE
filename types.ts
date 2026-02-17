@@ -9,6 +9,7 @@ export enum BookingStatus {
   PAID = 'PAID',             // Paid
   CHECKED_IN = 'CHECKED_IN', // Host marked as checked in (accounting)
   CANCELLED = 'CANCELLED',
+  BLOCKED = 'BLOCKED',       // Blocked by host (e.g. maintenance or OTA booking)
 }
 
 export interface User {

@@ -17,7 +17,7 @@ export const MOCK_USER_HOST: User = {
 };
 
 export const PHYSICAL_ROOMS_LIST = [
-  '108', // Vesselin & Bach (Spec says TBD, keeping 108)
+  '001', // Vesselin theme room
   '103', '105', '106', '107', // Maya Legend
   '101', '102', // Maya Classic
   '301', '302', // Antiguo
@@ -33,7 +33,7 @@ export const INITIAL_PHYSICAL_ROOMS: PhysicalRoom[] = PHYSICAL_ROOMS_LIST.map(nu
 export const ROOMS: Room[] = [
   {
     id: 'rt_vesselin',
-    name: '主題客房 (Vesselin & Bach)',
+    name: '主題客房',
     description: '位於樓下，針對2人設計的頂級房型，配備按摩椅、大屏電視與音響。',
     floorLocation: '樓下',
     maxGuests: 2,
@@ -46,7 +46,7 @@ export const ROOMS: Room[] = [
     images: [
       'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80'
     ],
-    roomNumbers: ['108'],
+    roomNumbers: ['001'],
     amenities: ['按摩椅', '大屏電視', '音響']
   },
   {

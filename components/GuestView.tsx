@@ -105,9 +105,6 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, onBook, che
 
                         <div className="p-4 md:p-5">
                             <div className="flex flex-wrap gap-2 mb-4">
-                                <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-md border border-blue-100">
-                                    {room.bedConfig}
-                                </span>
                                 {room.amenities?.map((tag, i) => (
                                     <span key={i} className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-md border border-gray-100">
                                         {tag}
@@ -115,7 +112,8 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, onBook, che
                                 ))}
                             </div>
 
-                            {/* Size info removed as requested */}
+
+                            {/* Size, Floor, and Description removed as requested for simplified view */}
 
                             <div className="flex items-end justify-between mt-2 pt-2 border-t border-gray-50">
                                 <div>

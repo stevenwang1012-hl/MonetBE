@@ -41,20 +41,17 @@ create table public.bookings (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 4. Enable Row Level Security (RLS)
-alter table public.room_types enable row level security;
-alter table public.rooms enable row level security;
-alter table public.bookings enable row level security;
+-- 4. Disable Row Level Security (RLS) for development
+-- (User requested to keep RLS off for initial testing)
+alter table public.room_types disable row level security;
+alter table public.rooms disable row level security;
+alter table public.bookings disable row level security;
 
--- Policies (Simplified for demo)
--- Allow public read access to room types
-create policy "Public read room types" on public.room_types for select using (true);
--- Allow public read access to rooms (availability check)
-create policy "Public read rooms" on public.rooms for select using (true);
--- Allow anyone to create bookings
-create policy "Public create bookings" on public.bookings for insert with check (true);
--- Allow users to read their own bookings (Mock: logic handled in app for now)
-create policy "Read own bookings" on public.bookings for select using (true); 
+-- Policies are not needed when RLS is disabled, but keeping them commented out for future reference
+-- create policy "Public read room types" on public.room_types for select using (true);
+-- create policy "Public read rooms" on public.rooms for select using (true);
+-- create policy "Public create bookings" on public.bookings for insert with check (true);
+-- create policy "Read own bookings" on public.bookings for select using (true); 
 
 -- 5. Seed Data (Based on room_spec.md)
 
@@ -62,7 +59,7 @@ create policy "Read own bookings" on public.bookings for select using (true);
 insert into public.room_types 
 (id, name, floor_location, max_guests, bed_config, size_sqm, porch_size_sqm, price_weekday, price_holiday, price_cny, amenities)
 values 
-('rt_vesselin', 'Vesselin & Bach (主題客房)', '樓下', 2, '加大床 × 1', 45, null, 3200, 3500, 4800, ARRAY['按摩椅', '大屏電視', '音響']),
+('rt_vesselin', '主題客房', '樓下', 2, '加大床 × 1', 45, null, 3200, 3500, 4800, ARRAY['按摩椅', '大屏電視', '音響']),
 ('rt_maya_legend', '馬雅傳說', '樓下', 4, '標準雙人床 × 2', 30, 8, 2800, 3200, 5000, null),
 ('rt_maya_classic', '馬雅經典', '樓下', 2, '加大床 × 1', 30, 8, 2300, 2500, 4200, null),
 ('rt_antiguo', '安提哥', '二樓', 2, '標準雙人床 × 1', 26, 6, 2000, 2300, 3300, null),
@@ -72,7 +69,7 @@ values
 -- Insert Rooms (Inventory)
 insert into public.rooms (room_number, room_type_id) values
 -- Vesselin (1 room, number TBD, let's assume 108)
-('108', 'rt_vesselin'),
+('001', 'rt_vesselin'),
 -- Maya Legend (4 rooms)
 ('103', 'rt_maya_legend'),
 ('105', 'rt_maya_legend'),

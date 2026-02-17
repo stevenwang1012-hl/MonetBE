@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from './supabase';
 import { User, UserRole, Booking, BookingStatus, Room, PhysicalRoom } from './types';
 import { MOCK_USER_GUEST, MOCK_USER_HOST, ROOMS, INITIAL_BOOKINGS, INITIAL_PHYSICAL_ROOMS } from './constants';
 import { Button, ScreenContainer, Header, Icons } from './ui';
 import { getDiffDays, calculateTotalPrice } from './utils';
+import { migrateRoomsToSupabase } from './utils/migration';
 
 // Components
 import { LoginScreen } from './components/LoginScreen';
@@ -11,6 +13,7 @@ import { HostLayout } from './components/Host/HostLayout';
 
 // --- Main App ---
 export default function App() {
+  // --- State ---
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'explore' | 'trips'>('explore');
 
@@ -18,161 +21,322 @@ export default function App() {
   const [checkIn, setCheckIn] = useState<string>(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
   const [checkOut, setCheckOut] = useState<string>(new Date(Date.now() + 172800000).toISOString().split('T')[0]);
 
-  // Persistence Logic
-  // State for data persistence
-  const [rooms, setRooms] = useState<Room[]>(() => {
-    const saved = localStorage.getItem('monetBB_rooms');
-    return saved ? JSON.parse(saved) : ROOMS;
-  });
+  // Data State
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [roomOccupancy, setRoomOccupancy] = useState<Record<string, boolean>>({});
+  const [breakfastPrice, setBreakfastPrice] = useState<number>(220);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [breakfastPrice, setBreakfastPrice] = useState<number>(() => {
-    const saved = localStorage.getItem('monetBB_breakfast_price');
-    return saved ? parseInt(saved) : 220;
-  });
+  // --- Initial Data Fetching (Supabase) ---
+  const fetchRooms = async () => {
+    try {
+      // 1. Fetch Room Types
+      const { data: roomTypes, error: rtError } = await supabase.from('room_types').select('*');
+      if (rtError) throw rtError;
 
-  // Persist rooms and breakfast price
-  useEffect(() => {
-    localStorage.setItem('monetBB_rooms', JSON.stringify(rooms));
-  }, [rooms]);
+      // 2. Fetch Physical Rooms
+      const { data: physicalRooms, error: rError } = await supabase.from('rooms').select('*');
+      if (rError) throw rError;
 
-  useEffect(() => {
-    localStorage.setItem('monetBB_breakfast_price', breakfastPrice.toString());
-  }, [breakfastPrice]);
-
-  // Data Migration: Sync roomNumbers from constants if missing in local storage
-  // Also handle ID migration from 'room_' to 'rt_'
-  useEffect(() => {
-    setRooms(prevRooms => {
-      // Check if we need a full reset (e.g. key room 'rt_vesselin' is missing)
-      const needsFullReset = !prevRooms.some(r => r.id === 'rt_vesselin');
-
-      if (needsFullReset) {
-        console.log('Migrating to new Room IDs (rt_)...');
-        return ROOMS;
-      }
-
-      // Check if any room is missing roomNumbers or has empty roomNumbers where the constant has them
-      const needsMigration = prevRooms.some(r => {
-        const constantRoom = ROOMS.find(c => c.id === r.id);
-        return (!r.roomNumbers || r.roomNumbers.length === 0) && (constantRoom?.roomNumbers?.length || 0) > 0;
-      });
-
-      if (needsMigration) {
-        console.log('Migrating room data to include roomNumbers...');
-        return prevRooms.map(r => {
-          const constantRoom = ROOMS.find(c => c.id === r.id);
-          if (constantRoom && constantRoom.roomNumbers) {
-            return {
-              ...r,
-              roomNumbers: constantRoom.roomNumbers,
-              // Update other critical fields that might be stale
-              images: constantRoom.images,
-              name: constantRoom.name,
-              maxGuests: constantRoom.maxGuests
-            };
-          }
-          return r;
+      if (roomTypes && roomTypes.length > 0) {
+        // Transform DB data to App types
+        const formattedRooms: Room[] = roomTypes.map((rt: any) => {
+          const associatedRooms = physicalRooms?.filter((r: any) => r.room_type_id === rt.id) || [];
+          return {
+            id: rt.id,
+            name: rt.name,
+            floorLocation: rt.floor_location,
+            maxGuests: rt.max_guests,
+            bedConfig: rt.bed_config,
+            sizeSqm: rt.size_sqm,
+            priceWeekday: rt.price_weekday,
+            priceHoliday: rt.price_holiday,
+            priceCny: rt.price_cny,
+            price: rt.price_weekday, // Default to weekday
+            description: rt.description,
+            images: (() => {
+              if (!rt.image_url) return [];
+              try {
+                const parsed = JSON.parse(rt.image_url);
+                return Array.isArray(parsed) ? parsed : [rt.image_url];
+              } catch {
+                return [rt.image_url];
+              }
+            })(),
+            amenities: rt.amenities || [],
+            roomNumbers: associatedRooms.map((r: any) => r.room_number)
+          };
         });
+        setRooms(formattedRooms);
+      } else {
+        // Fallback or Migration Trigger
+        setRooms(ROOMS);
       }
-      return prevRooms;
-    });
+
+    } catch (error) {
+      console.error('Error fetching rooms:', error);
+      // Fallback
+      const savedRooms = localStorage.getItem('monetBB_rooms');
+      if (savedRooms) setRooms(JSON.parse(savedRooms));
+    }
+  };
+
+  const fetchBookings = async () => {
+    try {
+      const { data: bookingsData, error: bError } = await supabase.from('bookings').select('*');
+      if (bError) throw bError;
+
+      if (bookingsData) {
+        const formattedBookings: Booking[] = bookingsData.map((b: any) => ({
+          id: b.id,
+          roomId: b.room_type_id,
+          userId: b.user_id,
+          guestName: b.guest_name,
+          date: b.check_in_date,
+          endDate: b.check_out_date,
+          status: b.status,
+          createdAt: new Date(b.created_at).getTime(),
+          assignedPhysicalRoom: b.assigned_room_number || undefined,
+          hasBreakfast: false, // Default for now
+          breakfastCount: 0,
+          totalPrice: 0
+        }));
+        setBookings(formattedBookings);
+      }
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        await fetchRooms();
+        await fetchBookings();
+      } catch (error) {
+        console.error('Error fetching data from Supabase:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+
+    // Removed Supabase Auth Listener (Using LIFF for now)
+  }, []); // Only run once on mount
+
+  // --- Realtime Subscription (Simplified Reuse) ---
+  // Ideally use supabase.channel here to listen for changes
+  useEffect(() => {
+    const channel = supabase.channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        (payload) => {
+          console.log('Change received!', payload);
+          // Simple re-fetch strategy for V1
+          // In production, update state incrementally
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const [bookings, setBookings] = useState<Booking[]>(() => {
-    const saved = localStorage.getItem('monetBB_bookings');
-    return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
-  });
-
-  const [roomOccupancy, setRoomOccupancy] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('monetBB_roomOccupancy');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  React.useEffect(() => {
-    localStorage.setItem('monetBB_bookings', JSON.stringify(bookings));
-  }, [bookings]);
-
-  React.useEffect(() => {
-    localStorage.setItem('monetBB_roomOccupancy', JSON.stringify(roomOccupancy));
-  }, [roomOccupancy]);
-
   const [showBookingModal, setShowBookingModal] = useState<Room | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [addBreakfast, setAddBreakfast] = useState<boolean>(false);
   const [breakfastCount, setBreakfastCount] = useState<number>(1);
 
-  const handleLogin = (role: UserRole) => {
-    if (role === UserRole.GUEST) setUser(MOCK_USER_GUEST);
-    else setUser(MOCK_USER_HOST);
+  const handleLogin = (role: UserRole, profile?: any) => {
+    if (role === UserRole.HOST) {
+      setUser(MOCK_USER_HOST);
+      setActiveTab('dashboard');
+    } else {
+      // LIFF Login Success
+      if (profile) {
+        const newUser: User = {
+          id: profile.userId,
+          name: profile.displayName,
+          avatar: profile.pictureUrl,
+          role: UserRole.GUEST,
+          lineId: profile.userId
+        };
+        setUser(newUser);
+      } else {
+        // Fallback guest
+        setUser(MOCK_USER_GUEST);
+      }
+      setActiveTab('explore');
+    }
   };
 
-  const handleCreateBooking = (room: Room) => {
+  const handleCreateBooking = async (room: Room) => {
     if (!user) return;
-    const newBooking: Booking = {
-      id: `b_${Date.now()}`,
-      roomId: room.id,
-      userId: user.id,
-      guestName: user.name,
-      date: checkIn,
-      endDate: checkOut,
+    const newBooking = {
+      // id: auto-generated by DB
+      room_type_id: room.id,
+      user_id: user.id,
+      guest_name: user.name,
+      check_in_date: checkIn,
+      check_out_date: checkOut,
       status: BookingStatus.PENDING,
-      createdAt: Date.now(),
-      hasBreakfast: addBreakfast,
-      breakfastCount: addBreakfast ? breakfastCount : 0,
-      totalPrice: calculateTotalPrice(checkIn, checkOut, room, { hasBreakfast: addBreakfast, guests: breakfastCount })
+      // created_at: auto
     };
-    setBookings(prev => [...prev, newBooking]);
+
+    const { error } = await supabase.from('bookings').insert([newBooking]);
+    if (error) {
+      console.error('Error creating booking:', error);
+      alert('預約失敗，請稍後再試');
+      return;
+    }
+
+    // Optimistic Update or Refetch?
+    // For now, let's just alert success. The Realtime subscription should ideally handle the update,
+    // but we haven't implemented full realtime sync logic for state yet.
+    // Let's manually fetch or just force reload for V1 prototype.
+    // Let's manually fetch or just force reload for V1 prototype.
+    // alert('預約申請已送出！'); // Replaced with modal
+    await fetchBookings(); // Refresh bookings to get the new ID and status
     setShowBookingModal(null);
+    setShowSuccessModal(true);
     setActiveTab('trips');
+    // window.location.reload(); // Temporary force refresh to see data
   };
 
-  const handleTogglePhysicalRoom = (roomNumber: string) => {
-    setRoomOccupancy(prev => ({
-      ...prev,
-      [roomNumber]: !prev[roomNumber]
-    }));
-  };
+  const handleTogglePhysicalRoom = async (roomNumber: string, date: string) => {
+    if (!user) return;
 
-  const handleHostAction = (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => {
-    setBookings(prev => prev.map(b => {
-      if (b.id !== bookingId) return b;
+    // Check availability for this specific room and date
+    // Note: This logic duplicates some server-side or complex checking, simplified for V1
+    const targetRoom = rooms.find(r => r.roomNumbers?.includes(roomNumber));
+    if (!targetRoom) return;
 
-      if (action === 'confirm' && assignedRoom) {
-        // handleTogglePhysicalRoom(assignedRoom); // Removed: Do not set manual occupancy on confirmation
-        return { ...b, status: BookingStatus.CONFIRMED, assignedPhysicalRoom: assignedRoom };
+    // Check if there is an existing booking for this physical room that overlaps with the target date
+    // Overlap: Start <= TargetDate < End
+    // We only care about the single date for the dashboard toggle
+    const nextDay = new Date(new Date(date).getTime() + 86400000).toISOString().split('T')[0];
+
+    // Find blocking booking
+    const blockingBooking = bookings.find(b =>
+      b.assignedPhysicalRoom === roomNumber &&
+      b.status !== BookingStatus.CANCELLED &&
+      b.date <= date && b.endDate > date
+    );
+
+    if (blockingBooking) {
+      // If it's a manual block (e.g. created by host or marked as BLOCKED)
+      // For V1, we assume if the host clicks a 'BLOCKED' room, they want to unblock it.
+      // If they click a 'GUEST' booking, maybe show details? For now, prevent toggling guest bookings easily or ask confirmation.
+
+      if (blockingBooking.status === BookingStatus.BLOCKED) {
+        // Unblock: Delete or Cancel
+        const { error } = await supabase.from('bookings').delete().eq('id', blockingBooking.id);
+        if (error) {
+          console.error('Error unblocking room:', error);
+          alert('解除鎖定失敗');
+          return;
+        }
+      } else {
+        alert('此房間已有房客預約，無法直接解除鎖定。請至訂單管理操作。');
+        return;
       }
 
-      if (action === 'checkin') {
-        return { ...b, status: BookingStatus.CHECKED_IN };
+    } else {
+      // Block the room
+      const newBlock = {
+        user_id: user.id,
+        room_type_id: targetRoom.id,
+        guest_name: '手動鎖房',
+        check_in_date: date,
+        check_out_date: nextDay, // 1 night block
+        status: BookingStatus.BLOCKED,
+        assigned_room_number: roomNumber
+      };
+
+      const { error } = await supabase.from('bookings').insert([newBlock]);
+      if (error) {
+        console.error('Error blocking room:', error);
+        alert('鎖定失敗');
+        return;
       }
+    }
 
-      if (action === 'reject') {
-        return { ...b, status: BookingStatus.CANCELLED };
-      }
-
-      if (action === 'pay') {
-        return { ...b, status: BookingStatus.PAID };
-      }
-
-      return b;
-    }));
+    await fetchBookings();
   };
 
-  const handleCancelBooking = (bookingId: string) => {
-    setBookings(prev => prev.map(b =>
-      b.id === bookingId ? { ...b, status: BookingStatus.CANCELLED } : b
-    ));
+  const handleHostAction = async (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => {
+    let updates: any = {};
+    if (action === 'confirm' && assignedRoom) {
+      updates = { status: BookingStatus.CONFIRMED, assigned_room_number: assignedRoom };
+    } else if (action === 'checkin') {
+      updates = { status: BookingStatus.CHECKED_IN };
+    } else if (action === 'reject') {
+      updates = { status: BookingStatus.CANCELLED };
+    } else if (action === 'pay') {
+      updates = { status: BookingStatus.PAID };
+    }
+
+    try {
+      const { error } = await supabase.from('bookings').update(updates).eq('id', bookingId);
+      if (error) throw error;
+
+      // Optimistic update
+      setBookings(prev => prev.map(b => {
+        if (b.id !== bookingId) return b;
+        return {
+          ...b,
+          status: updates.status || b.status,
+          assignedPhysicalRoom: updates.assigned_room_number || b.assignedPhysicalRoom
+        };
+      }));
+
+      // Optional: Refetch to be safe
+      // await fetchBookings();
+    } catch (error) {
+      console.error('Error updating booking:', error);
+      alert('更新失敗');
+    }
   };
 
-  const handleUpdateRoom = (updatedRoom: Room) => {
-    setRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r));
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase.from('bookings').update({ status: BookingStatus.CANCELLED }).eq('id', bookingId);
+      if (error) throw error;
+
+      setBookings(prev => prev.map(b =>
+        b.id === bookingId ? { ...b, status: BookingStatus.CANCELLED } : b
+      ));
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      alert('取消失敗');
+    }
   };
 
-  const handleCreateRoom = (newRoom: Room) => {
-    setRooms(prev => [...prev, newRoom]);
+  const handleUpdateRoom = async (updatedRoom: Room) => {
+    // Optimistic Update Local State (optional, but good for responsiveness)
+    setRooms(rooms.map(r => r.id === updatedRoom.id ? updatedRoom : r));
+    // Refetch to confirm consistency with DB triggers/defaults
+    await fetchRooms();
   };
 
-  const handleDeleteRoom = (roomId: string) => {
-    setRooms(prev => prev.filter(r => r.id !== roomId));
+  const handleCreateRoom = async (newRoom: Room) => {
+    // Refetch to get the correct list including the new one
+    await fetchRooms();
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    try {
+      const { error } = await supabase.from('room_types').delete().eq('id', roomId);
+      if (error) throw error;
+
+      // Refetch
+      await fetchRooms();
+    } catch (error) {
+      console.error('Error deleting room:', error);
+      alert('刪除失敗');
+    }
   };
 
   if (!user) return <LoginScreen onLogin={handleLogin} />;
@@ -187,11 +351,24 @@ export default function App() {
     return (
       <ScreenContainer>
         <div className="sticky top-0 z-50">
-          <Header
-            title="花蓮莫內花園咖啡農莊"
-            subtitle="花蓮縣壽豐鄉池南路一段138號"
-            rightAction={<img src={user.avatar} className="w-8 h-8 rounded-full bg-gray-200 border border-white shadow-sm" />}
-          />
+          {(() => {
+            console.log('Current User Avatar:', user.avatar);
+            const AvatarIcon = user.avatar ? (
+              <img src={user.avatar} className="w-8 h-8 rounded-full bg-gray-200 border border-white shadow-sm object-cover" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gray-200 border border-white shadow-sm flex items-center justify-center">
+                <Icons.User className="w-4 h-4 text-gray-500" />
+              </div>
+            );
+
+            return (
+              <Header
+                title="花蓮莫內花園咖啡農莊"
+                subtitle="花蓮縣壽豐鄉池南路一段138號"
+                rightAction={AvatarIcon}
+              />
+            );
+          })()}
         </div>
 
         {activeTab === 'explore' && (
@@ -251,9 +428,9 @@ export default function App() {
 
         <main className="pt-2">
           {activeTab === 'explore' ? (
-            <RoomList rooms={ROOMS} bookings={bookings} onBook={setShowBookingModal} checkIn={checkIn} checkOut={checkOut} />
+            <RoomList rooms={rooms} bookings={bookings} onBook={setShowBookingModal} checkIn={checkIn} checkOut={checkOut} />
           ) : (
-            <GuestHistory bookings={myBookings} rooms={ROOMS} onCancel={handleCancelBooking} />
+            <GuestHistory bookings={myBookings} rooms={rooms} onCancel={handleCancelBooking} />
           )}
         </main>
 
@@ -280,16 +457,30 @@ export default function App() {
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-200 mx-auto">
               <div className="flex gap-4 mb-4">
-                <img src={showBookingModal.images[0]} className="w-20 h-20 rounded-xl object-cover" />
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-xl font-bold truncate">{showBookingModal.name}</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {showBookingModal.bedConfig}
-                  </p>
-                  <p className="text-gray-900 font-bold text-lg mt-1">
-                    NT$ {calculateTotalPrice(checkIn, checkOut, showBookingModal, { hasBreakfast: addBreakfast, guests: breakfastCount }).toLocaleString()}
-                  </p>
-                </div>
+                {(() => {
+                  const currentBookingRoom = rooms.find(r => r.id === showBookingModal.id) || showBookingModal;
+                  return (
+                    <>
+                      <img src={currentBookingRoom.images[0]} className="w-20 h-20 rounded-xl object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-bold truncate">{currentBookingRoom.name}</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {currentBookingRoom.bedConfig}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {currentBookingRoom.amenities?.map((tag, i) => (
+                            <span key={i} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded border border-gray-200">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-gray-900 font-bold text-lg mt-1">
+                          NT$ {calculateTotalPrice(checkIn, checkOut, currentBookingRoom, { hasBreakfast: addBreakfast, guests: breakfastCount }).toLocaleString()}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
               <p className="text-gray-500 text-xs mb-4 leading-relaxed bg-gray-50 p-3 rounded-xl">
                 請點擊下方確認預約。管家將在收到通知後與您聯繫指派房號並確認匯款資訊。
@@ -333,6 +524,27 @@ export default function App() {
                 <Button fullWidth onClick={() => handleCreateBooking(showBookingModal)}>確認預約 (共 {getDiffDays(checkIn, checkOut)} 晚)</Button>
                 <Button fullWidth variant="ghost" onClick={() => setShowBookingModal(null)}>取消</Button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showSuccessModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl transform transition-all scale-100 flex flex-col items-center text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600">
+                <Icons.Check className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">預約申請已送出！</h3>
+              <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                管家收到通知後，將會主動聯繫您確認房號與匯款資訊。
+              </p>
+              <Button
+                fullWidth
+                className="bg-black text-white hover:bg-gray-800 rounded-xl"
+                onClick={() => setShowSuccessModal(false)}
+              >
+                好的，我知道了
+              </Button>
             </div>
           </div>
         )}

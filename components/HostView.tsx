@@ -7,18 +7,19 @@ import { INITIAL_PHYSICAL_ROOMS } from '../constants';
 // --- RoomGrid ---
 export const RoomGrid = ({ rooms, roomOccupancy, onToggle }: { rooms: Room[], roomOccupancy: Record<string, boolean>, onToggle: (num: string) => void }) => {
     return (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-                <h2 className="font-bold text-lg text-gray-900">房間狀態實時看板</h2>
-                <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wider">
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500"></div>空閒中</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div>已佔用</div>
+        <div className="mt-2">
+            {/* Legend - Moved to top right or kept here but clean */}
+            <div className="flex justify-end mb-4">
+                <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wider bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                    <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>空閒中</div>
+                    <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>已佔用</div>
                 </div>
             </div>
+
             <div className="space-y-6">
                 {rooms.filter(r => r.roomNumbers && r.roomNumbers.length > 0).map(room => (
-                    <div key={room.id}>
-                        <h3 className="text-xs font-bold text-gray-500 mb-2 pl-1">{room.name}</h3>
+                    <div key={room.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
+                        <h3 className="text-sm font-bold text-gray-500 mb-3 pl-1">{room.name}</h3>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                             {room.roomNumbers?.map(num => {
                                 const isOccupied = roomOccupancy[num];
@@ -26,13 +27,13 @@ export const RoomGrid = ({ rooms, roomOccupancy, onToggle }: { rooms: Room[], ro
                                     <button
                                         key={num}
                                         onClick={() => onToggle(num)}
-                                        className={`flex flex-col items-center justify-center py-4 rounded-2xl border-2 transition-all duration-200 active:scale-95 ${isOccupied
-                                            ? 'bg-red-50 border-red-200 text-red-700 shadow-inner'
+                                        className={`flex flex-col items-center justify-center py-4 px-2 rounded-xl border-2 transition-all duration-200 active:scale-95 shadow-sm ${isOccupied
+                                            ? 'bg-red-50 border-red-200 text-red-700'
                                             : 'bg-green-50 border-green-200 text-green-700 hover:shadow-md'
                                             }`}
                                     >
-                                        <span className="text-sm font-black mb-0.5">{num}</span>
-                                        <span className="text-[10px] opacity-80 font-bold">{isOccupied ? '已佔用' : '空閒'}</span>
+                                        <span className="text-xl font-black mb-1">{num}</span>
+                                        <span className="text-xs font-bold opacity-90">{isOccupied ? '已佔用' : '空閒'}</span>
                                     </button>
                                 );
                             })}
@@ -150,7 +151,7 @@ export const HostDashboard = ({
     rooms: Room[],
     roomOccupancy: Record<string, boolean>,
     onAction: (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => void,
-    onToggleRoom: (num: string) => void
+    onToggleRoom: (num: string, date: string) => void
 }) => {
     // State for dashboard date
     const [dashboardDate, setDashboardDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -159,7 +160,7 @@ export const HostDashboard = ({
     const occupiedRoomNumbers = new Set(
         bookings
             .filter(b =>
-                (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID || b.status === BookingStatus.CHECKED_IN) &&
+                (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID || b.status === BookingStatus.CHECKED_IN || b.status === BookingStatus.BLOCKED) &&
                 b.assignedPhysicalRoom &&
                 b.date <= dashboardDate && b.endDate > dashboardDate
             )
@@ -194,7 +195,7 @@ export const HostDashboard = ({
         // Overlap logic: (StartA < EndB) && (EndA > StartB)
         const overlappingBookings = bookings.filter(b =>
             b.id !== targetBooking.id && // exclude self
-            (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID || b.status === BookingStatus.CHECKED_IN) &&
+            (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID || b.status === BookingStatus.CHECKED_IN || b.status === BookingStatus.BLOCKED) &&
             b.assignedPhysicalRoom && // has a room assigned
             (b.date < targetBooking.endDate && b.endDate > targetBooking.date) // active overlap
         );
@@ -244,7 +245,7 @@ export const HostDashboard = ({
                 <RoomGrid
                     rooms={rooms}
                     roomOccupancy={displayOccupancy}
-                    onToggle={onToggleRoom}
+                    onToggle={(num) => onToggleRoom(num, dashboardDate)}
                 />
             </div>
 
