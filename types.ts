@@ -33,6 +33,7 @@ export interface Room {
   priceHoliday: number;
   priceCny: number;
   images: string[]; // Updated to array for carousel
+  roomNumbers?: string[]; // Physical room numbers (e.g. ['201', '202'])
   // Calculated fields for compatibility or display
   price?: number; // Optional, might be deprecated or used as 'display price'
   tags?: string[]; // Kept for UI compatibility

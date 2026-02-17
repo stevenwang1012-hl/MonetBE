@@ -39,14 +39,53 @@ export default function App() {
     localStorage.setItem('monetBB_breakfast_price', breakfastPrice.toString());
   }, [breakfastPrice]);
 
+  // Data Migration: Sync roomNumbers from constants if missing in local storage
+  // Also handle ID migration from 'room_' to 'rt_'
+  useEffect(() => {
+    setRooms(prevRooms => {
+      // Check if we need a full reset (e.g. key room 'rt_vesselin' is missing)
+      const needsFullReset = !prevRooms.some(r => r.id === 'rt_vesselin');
+
+      if (needsFullReset) {
+        console.log('Migrating to new Room IDs (rt_)...');
+        return ROOMS;
+      }
+
+      // Check if any room is missing roomNumbers or has empty roomNumbers where the constant has them
+      const needsMigration = prevRooms.some(r => {
+        const constantRoom = ROOMS.find(c => c.id === r.id);
+        return (!r.roomNumbers || r.roomNumbers.length === 0) && (constantRoom?.roomNumbers?.length || 0) > 0;
+      });
+
+      if (needsMigration) {
+        console.log('Migrating room data to include roomNumbers...');
+        return prevRooms.map(r => {
+          const constantRoom = ROOMS.find(c => c.id === r.id);
+          if (constantRoom && constantRoom.roomNumbers) {
+            return {
+              ...r,
+              roomNumbers: constantRoom.roomNumbers,
+              // Update other critical fields that might be stale
+              images: constantRoom.images,
+              name: constantRoom.name,
+              maxGuests: constantRoom.maxGuests
+            };
+          }
+          return r;
+        });
+      }
+      return prevRooms;
+    });
+  }, []);
+
   const [bookings, setBookings] = useState<Booking[]>(() => {
     const saved = localStorage.getItem('monetBB_bookings');
     return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
   });
 
-  const [physicalRooms, setPhysicalRooms] = useState<PhysicalRoom[]>(() => {
-    const saved = localStorage.getItem('monetBB_physicalRooms');
-    return saved ? JSON.parse(saved) : INITIAL_PHYSICAL_ROOMS;
+  const [roomOccupancy, setRoomOccupancy] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('monetBB_roomOccupancy');
+    return saved ? JSON.parse(saved) : {};
   });
 
   React.useEffect(() => {
@@ -54,8 +93,8 @@ export default function App() {
   }, [bookings]);
 
   React.useEffect(() => {
-    localStorage.setItem('monetBB_physicalRooms', JSON.stringify(physicalRooms));
-  }, [physicalRooms]);
+    localStorage.setItem('monetBB_roomOccupancy', JSON.stringify(roomOccupancy));
+  }, [roomOccupancy]);
 
   const [showBookingModal, setShowBookingModal] = useState<Room | null>(null);
   const [addBreakfast, setAddBreakfast] = useState<boolean>(false);
@@ -87,9 +126,10 @@ export default function App() {
   };
 
   const handleTogglePhysicalRoom = (roomNumber: string) => {
-    setPhysicalRooms(prev => prev.map(r =>
-      r.number === roomNumber ? { ...r, isOccupied: !r.isOccupied } : r
-    ));
+    setRoomOccupancy(prev => ({
+      ...prev,
+      [roomNumber]: !prev[roomNumber]
+    }));
   };
 
   const handleHostAction = (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => {
@@ -97,7 +137,7 @@ export default function App() {
       if (b.id !== bookingId) return b;
 
       if (action === 'confirm' && assignedRoom) {
-        handleTogglePhysicalRoom(assignedRoom);
+        // handleTogglePhysicalRoom(assignedRoom); // Removed: Do not set manual occupancy on confirmation
         return { ...b, status: BookingStatus.CONFIRMED, assignedPhysicalRoom: assignedRoom };
       }
 
@@ -155,35 +195,56 @@ export default function App() {
         </div>
 
         {activeTab === 'explore' && (
-          <div className="bg-white border-b border-gray-200 sticky top-[76px] z-40 shadow-sm px-4 py-2 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 flex-1 border border-gray-200">
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider whitespace-nowrap">入住</span>
-              <input
-                type="date"
-                className="text-xs font-bold bg-transparent outline-none text-gray-700 w-full p-0 border-none focus:ring-0"
-                value={checkIn}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={(e) => {
-                  setCheckIn(e.target.value);
-                  if (e.target.value >= checkOut) {
-                    const nextDay = new Date(new Date(e.target.value).getTime() + 86400000).toISOString().split('T')[0];
-                    setCheckOut(nextDay);
-                  }
-                }}
-              />
-            </div>
-            <div className="text-gray-300">
-              <Icons.ArrowRight className="w-4 h-4" />
-            </div>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 flex-1 border border-gray-200">
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider whitespace-nowrap">退房</span>
-              <input
-                type="date"
-                className="text-xs font-bold bg-transparent outline-none text-gray-700 w-full p-0 border-none focus:ring-0"
-                value={checkOut}
-                min={new Date(new Date(checkIn).getTime() + 86400000).toISOString().split('T')[0]}
-                onChange={(e) => setCheckOut(e.target.value)}
-              />
+          <div className="bg-white border-b border-gray-200 sticky top-[60px] z-40 shadow-sm px-4 py-3">
+            {/* Single Row Compact Date Picker - Overlay Input for Max Touch Target */}
+            <div className="bg-white rounded-full border border-gray-200 shadow-md px-4 flex items-center justify-between gap-2 h-11 w-full max-w-full relative">
+              {/* Check-in Section */}
+              <div className="flex items-center gap-2 flex-1 min-w-0 relative h-full justify-center">
+                <div className="flex items-center gap-2 z-0 pointer-events-none">
+                  <span className="text-[10px] text-gray-500 font-bold flex-shrink-0 whitespace-nowrap">入住</span>
+                  <span className="text-sm font-bold text-gray-900 truncate">{checkIn.replace(/-/g, '/')}</span>
+                </div>
+                <input
+                  type="date"
+                  className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                  value={checkIn}
+                  min={new Date().toISOString().split('T')[0]}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch (err) { }
+                  }}
+                  onChange={(e) => {
+                    setCheckIn(e.target.value);
+                    if (e.target.value >= checkOut) {
+                      const nextDay = new Date(new Date(e.target.value).getTime() + 86400000).toISOString().split('T')[0];
+                      setCheckOut(nextDay);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="w-px h-4 bg-gray-300 flex-shrink-0"></div>
+
+              {/* Check-out Section */}
+              <div className="flex items-center gap-2 flex-1 min-w-0 relative h-full justify-center">
+                <div className="flex items-center gap-2 z-0 pointer-events-none">
+                  <span className="text-[10px] text-gray-500 font-bold flex-shrink-0 whitespace-nowrap">退房</span>
+                  <span className="text-sm font-bold text-gray-900 truncate">{checkOut.replace(/-/g, '/')}</span>
+                </div>
+                <input
+                  type="date"
+                  className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                  value={checkOut}
+                  min={new Date(new Date(checkIn).getTime() + 86400000).toISOString().split('T')[0]}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch (err) { }
+                  }}
+                  onChange={(e) => setCheckOut(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -289,7 +350,7 @@ export default function App() {
       <HostLayout
         bookings={bookings}
         rooms={rooms} // Use dynamic rooms state
-        physicalRooms={physicalRooms}
+        roomOccupancy={roomOccupancy}
         onAction={handleHostAction}
         onToggleRoom={handleTogglePhysicalRoom}
         onUpdateRoom={handleUpdateRoom}

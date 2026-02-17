@@ -53,9 +53,9 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, onBook, che
                 </button>
             </div>
 
-            <div className="space-y-6">
-                {displayRooms.length > 0 ? displayRooms.map(room => (
-                    <div key={room.id} className="group relative bg-white rounded-3xl overflow-hidden shadow-lg shadow-gray-200/50 border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {visibleRooms.length > 0 ? visibleRooms.map(room => (
+                    <div key={room.id} className="group relative bg-white rounded-3xl overflow-hidden shadow-lg shadow-gray-200/50 border border-gray-100 flex flex-col">
                         <div className="aspect-[4/3] w-full overflow-hidden relative group">
                             {room.images.length > 1 && (
                                 <>
@@ -186,10 +186,6 @@ export const GuestHistory = ({ bookings, rooms, onCancel }: { bookings: Booking[
                                     <div className="text-sm font-bold text-gray-900 mt-1">
                                         價格：NT$ {booking.totalPrice?.toLocaleString()}
                                     </div>
-
-                                    {booking.assignedPhysicalRoom && (
-                                        <p className="text-xs font-bold text-blue-600 mt-1 italic">房號：{booking.assignedPhysicalRoom}</p>
-                                    )}
                                 </div>
                             </div>
 

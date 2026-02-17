@@ -17,12 +17,12 @@ export const MOCK_USER_HOST: User = {
 };
 
 export const PHYSICAL_ROOMS_LIST = [
-  '108', // rt_vesselin (Assumed 108)
-  '103', '105', '106', '107', // rt_maya_legend
-  '101', '102', // rt_maya_classic
-  '301', '302', // rt_antiguo
-  '203', // rt_inca
-  '201', '202', '205' // rt_latin
+  '108', // Vesselin & Bach (Spec says TBD, keeping 108)
+  '103', '105', '106', '107', // Maya Legend
+  '101', '102', // Maya Classic
+  '301', '302', // Antiguo
+  '203', // Inca
+  '201', '202', '205' // Latin
 ];
 
 export const INITIAL_PHYSICAL_ROOMS: PhysicalRoom[] = PHYSICAL_ROOMS_LIST.map(num => ({
@@ -33,28 +33,26 @@ export const INITIAL_PHYSICAL_ROOMS: PhysicalRoom[] = PHYSICAL_ROOMS_LIST.map(nu
 export const ROOMS: Room[] = [
   {
     id: 'rt_vesselin',
-    name: 'Vesselin & Bach (主題客房)',
-    description: '位於樓下，擁有豪華加大床與專屬按摩椅，適合追求極致放鬆的旅客。',
+    name: '主題客房 (Vesselin & Bach)',
+    description: '位於樓下，針對2人設計的頂級房型，配備按摩椅、大屏電視與音響。',
     floorLocation: '樓下',
     maxGuests: 2,
     bedConfig: '加大床 × 1',
     sizeSqm: 45,
-    porchSizeSqm: undefined, // '大前廊', size unknown
-    amenities: ['按摩椅', '大屏電視', '音響'],
+    porchSizeSqm: 10, // Approximate large porch
     priceWeekday: 3200,
     priceHoliday: 3500,
     priceCny: 4800,
-    price: 3200, // Default display price
     images: [
-      'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1590490360182-c33d57733427?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=800&q=80'
     ],
-    tags: ['樓下', '加大床', '按摩椅']
+    roomNumbers: ['108'],
+    amenities: ['按摩椅', '大屏電視', '音響']
   },
   {
     id: 'rt_maya_legend',
     name: '馬雅傳說',
-    description: '寬敞的樓下四人房，配備兩張標準雙人床與專屬前廊，適合家庭或好友同遊。',
+    description: '位於樓下，適合4人入住，擁有寬敞的室內空間與前廊。',
     floorLocation: '樓下',
     maxGuests: 4,
     bedConfig: '標準雙人床 × 2',
@@ -63,17 +61,16 @@ export const ROOMS: Room[] = [
     priceWeekday: 2800,
     priceHoliday: 3200,
     priceCny: 5000,
-    price: 2800,
     images: [
-      'https://images.unsplash.com/photo-1566665797739-1674de7a421a?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1591088398332-8a7791972843?auto=format&fit=crop&w=800&q=80'
     ],
-    tags: ['樓下', '四人房', '前廊']
+    roomNumbers: ['103', '105', '106', '107'],
+    amenities: []
   },
   {
     id: 'rt_maya_classic',
     name: '馬雅經典',
-    description: '樓下加大雙人床房型，舒適的空間設計與前廊，是情侶度假的完美選擇。',
+    description: '位於樓下，經典雙人房型，舒適且便利。',
     floorLocation: '樓下',
     maxGuests: 2,
     bedConfig: '加大床 × 1',
@@ -82,16 +79,16 @@ export const ROOMS: Room[] = [
     priceWeekday: 2300,
     priceHoliday: 2500,
     priceCny: 4200,
-    price: 2300,
     images: [
-      'https://images.unsplash.com/photo-1618773928121-c32242e63f39?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80'
     ],
-    tags: ['樓下', '加大床', '前廊']
+    roomNumbers: ['101', '102'],
+    amenities: []
   },
   {
     id: 'rt_antiguo',
     name: '安提哥',
-    description: '位於二樓的精緻雙人房，擁有絕佳視野與寧靜氛圍，讓您盡情享受山林之美。',
+    description: '位於二樓 (房號3開頭)，視野開闊的雙人房。',
     floorLocation: '二樓',
     maxGuests: 2,
     bedConfig: '標準雙人床 × 1',
@@ -100,16 +97,16 @@ export const ROOMS: Room[] = [
     priceWeekday: 2000,
     priceHoliday: 2300,
     priceCny: 3300,
-    price: 2000,
     images: [
-      'https://images.unsplash.com/photo-1554995207-c18c203602cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=800&q=80'
     ],
-    tags: ['二樓', '高CP值']
+    roomNumbers: ['301', '302'],
+    amenities: []
   },
   {
     id: 'rt_inca',
     name: '印加風情',
-    description: '充滿異國風情的二樓雙人房，簡約舒適的設計，為您的旅程增添獨特回憶。',
+    description: '位於二樓，充滿異國風情的雙人房。',
     floorLocation: '二樓',
     maxGuests: 2,
     bedConfig: '標準雙人床 × 1',
@@ -118,16 +115,16 @@ export const ROOMS: Room[] = [
     priceWeekday: 2000,
     priceHoliday: 2300,
     priceCny: 3300,
-    price: 2000,
     images: [
-      'https://images.unsplash.com/photo-1582719508461-905c673771fd?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1590490359683-658d3d23f972?auto=format&fit=crop&w=800&q=80'
     ],
-    tags: ['二樓', '標準床']
+    roomNumbers: ['203'],
+    amenities: []
   },
   {
     id: 'rt_latin',
     name: '拉丁浪漫',
-    description: '經濟實惠的二樓雙人房，小巧溫馨，適合預算有限的小資族或背包客。',
+    description: '位於二樓，精緻小巧的浪漫雙人房。',
     floorLocation: '二樓',
     maxGuests: 2,
     bedConfig: '標準雙人床 × 1',
@@ -136,11 +133,11 @@ export const ROOMS: Room[] = [
     priceWeekday: 1600,
     priceHoliday: 1800,
     priceCny: 2800,
-    price: 1600,
     images: [
-      'https://images.unsplash.com/photo-1505691938895-1758d7feb511?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80'
     ],
-    tags: ['二樓', '小資首選', '獨立前廊']
+    roomNumbers: ['201', '202', '205'],
+    amenities: []
   }
 ];
 

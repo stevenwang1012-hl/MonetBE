@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Booking, Room, PhysicalRoom, BookingStatus } from '../types';
 import { Button, Card, StatusBadge, Icons } from '../ui';
 import { getDiffDays } from '../utils';
+import { INITIAL_PHYSICAL_ROOMS } from '../constants';
 
 // --- RoomGrid ---
-export const RoomGrid = ({ physicalRooms, onToggle }: { physicalRooms: PhysicalRoom[], onToggle: (num: string) => void }) => {
+export const RoomGrid = ({ rooms, roomOccupancy, onToggle }: { rooms: Room[], roomOccupancy: Record<string, boolean>, onToggle: (num: string) => void }) => {
     return (
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -14,19 +15,29 @@ export const RoomGrid = ({ physicalRooms, onToggle }: { physicalRooms: PhysicalR
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div>已佔用</div>
                 </div>
             </div>
-            <div className="grid grid-cols-5 gap-3">
-                {physicalRooms.map(room => (
-                    <button
-                        key={room.number}
-                        onClick={() => onToggle(room.number)}
-                        className={`flex flex-col items-center justify-center py-4 rounded-2xl border-2 transition-all duration-200 active:scale-95 ${room.isOccupied
-                            ? 'bg-red-50 border-red-200 text-red-700 shadow-inner'
-                            : 'bg-green-50 border-green-200 text-green-700 hover:shadow-md'
-                            }`}
-                    >
-                        <span className="text-sm font-black mb-0.5">{room.number}</span>
-                        <span className="text-[10px] opacity-80 font-bold">{room.isOccupied ? '已佔用' : '空閒'}</span>
-                    </button>
+            <div className="space-y-6">
+                {rooms.filter(r => r.roomNumbers && r.roomNumbers.length > 0).map(room => (
+                    <div key={room.id}>
+                        <h3 className="text-xs font-bold text-gray-500 mb-2 pl-1">{room.name}</h3>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                            {room.roomNumbers?.map(num => {
+                                const isOccupied = roomOccupancy[num];
+                                return (
+                                    <button
+                                        key={num}
+                                        onClick={() => onToggle(num)}
+                                        className={`flex flex-col items-center justify-center py-4 rounded-2xl border-2 transition-all duration-200 active:scale-95 ${isOccupied
+                                            ? 'bg-red-50 border-red-200 text-red-700 shadow-inner'
+                                            : 'bg-green-50 border-green-200 text-green-700 hover:shadow-md'
+                                            }`}
+                                    >
+                                        <span className="text-sm font-black mb-0.5">{num}</span>
+                                        <span className="text-[10px] opacity-80 font-bold">{isOccupied ? '已佔用' : '空閒'}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 ))}
             </div>
         </div>
@@ -40,6 +51,7 @@ interface BookingItemProps {
     availablePhysicalRooms: string[];
     actionType?: 'confirm' | 'checkin' | 'pay';
     onAction: (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => void;
+    dashboardDate?: string;
 }
 
 export const BookingItem: React.FC<BookingItemProps> = ({
@@ -130,13 +142,13 @@ export const BookingItem: React.FC<BookingItemProps> = ({
 export const HostDashboard = ({
     bookings,
     rooms,
-    physicalRooms,
+    roomOccupancy,
     onAction,
     onToggleRoom
 }: {
     bookings: Booking[],
     rooms: Room[],
-    physicalRooms: PhysicalRoom[],
+    roomOccupancy: Record<string, boolean>,
     onAction: (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => void,
     onToggleRoom: (num: string) => void
 }) => {
@@ -151,54 +163,45 @@ export const HostDashboard = ({
                 b.assignedPhysicalRoom &&
                 b.date <= dashboardDate && b.endDate > dashboardDate
             )
-            .map(b => b.assignedPhysicalRoom)
+            .map(b => b.assignedPhysicalRoom!)
     );
-
-    // Filter bookings for the list view (active on selected date or generally active)
-    // For the list, we probably still want to see "Upcoming" regardless of date, 
-    // OR we filter by date. 
-    // Usually "New Pending" is global. "Upcoming" might be global too, 
-    // but the Grid is definitely date-specific.
-    // Let's keep the lists as they were (Global Queue) but make the GRID date-specific.
-
-    // Actually, "In House" (Checked In) is relevant to active date? 
-    // Let's keep lists global for now as per "Dashboard" convention, 
-    // but Grid is the "Daily Status".
 
     const validBookings = bookings.filter(b => rooms.find(r => r.id === b.roomId));
     const pendingBookings = validBookings.filter(b => b.status === BookingStatus.PENDING);
     const activeBookings = validBookings.filter(b => b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID);
     const historyBookings = validBookings.filter(b => b.status === BookingStatus.CHECKED_IN);
 
-    // Get available rooms for assignment (Global availability? Or Date specific?)
-    // When assigning a room for a booking, we need to know if it's available for THAT booking's dates.
-    // The `availableRooms` here is used for the dropdown in `BookingItem`.
-    // We should probably check availability for the specific booking being confirmed.
-    // But for now, let's keep it simple or strictly valid.
-    // The current `availableRooms` was simple. Let's make it better.
-    // We'll calculate "Available Physical Rooms" based on the DATE of the booking being confirmed.
-    // But `BookingItem` doesn't do that calculation yet.
-    // Let's pass a helper or just available rooms for TODAY for now (as it was), 
-    // or improve `BookingItem` later. 
-    // Since the prompt is about the UI for room selection, let's focus on the GRID first.
+    // Merge calculated occupancy with manual roomOccupancy
+    // If a room is manually marked occupied, it shows occupied.
+    // If a room has a booking today, it shows occupied.
+    const displayOccupancy: Record<string, boolean> = { ...roomOccupancy };
+    occupiedRoomNumbers.forEach(num => {
+        displayOccupancy[num] = true;
+    });
 
-    // Merge calculated occupancy with physicalRooms prop (which handles manual toggles in App.tsx)
-    // For the dashboard view, we prioritize the calculated status for the selected date.
-    // But if it's today, we might want to respect the manual toggle? 
-    // Let's rely on the derived state for consistency with the date picker.
-
-    const displayPhysicalRooms = physicalRooms.map(r => ({
+    // Reconstruct physicalRooms from INITIAL_PHYSICAL_ROOMS combined with displayOccupancy
+    const physicalRooms = INITIAL_PHYSICAL_ROOMS.map(r => ({
         ...r,
-        isOccupied: occupiedRoomNumbers.has(r.number)
+        isOccupied: displayOccupancy[r.number] || false
     }));
 
-    // Note: onToggleRoom (manual toggle) might conflict with derived state if we don't save it as a booking.
-    // For now, onToggleRoom updates App.tsx state. If we use derived state here, 
-    // the App.tsx state update won't be reflected unless we merge them.
-    // If dashboardDate === Today, maybe merge? 
-    // Let's just use derived state to be "Pure" to the data.
+    // Helper to get available physical rooms for a specific booking date range
+    const getAvailableRoomsForBooking = (targetBooking: Booking) => {
+        const targetRoom = rooms.find(r => r.id === targetBooking.roomId);
+        if (!targetRoom || !targetRoom.roomNumbers) return [];
 
-    const isToday = dashboardDate === new Date().toISOString().split('T')[0];
+        // Find overlapping bookings that are confirmed/paid/checked-in/checked-out(today?? no)
+        // Overlap logic: (StartA < EndB) && (EndA > StartB)
+        const overlappingBookings = bookings.filter(b =>
+            b.id !== targetBooking.id && // exclude self
+            (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID || b.status === BookingStatus.CHECKED_IN) &&
+            b.assignedPhysicalRoom && // has a room assigned
+            (b.date < targetBooking.endDate && b.endDate > targetBooking.date) // active overlap
+        );
+
+        const occupiedNumbers = new Set(overlappingBookings.map(b => b.assignedPhysicalRoom));
+        return targetRoom.roomNumbers.filter(num => !occupiedNumbers.has(num));
+    };
 
     return (
         <div className="p-4 space-y-8 pb-32">
@@ -238,75 +241,50 @@ export const HostDashboard = ({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end mb-4 gap-4 text-[10px] font-bold uppercase tracking-wider">
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500"></div>空閒中</div>
-                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div>已佔用</div>
-                </div>
-
-                <div className="grid grid-cols-5 gap-3">
-                    {displayPhysicalRooms.map(room => (
-                        <div
-                            key={room.number}
-                            className={`flex flex-col items-center justify-center py-4 rounded-2xl border-2 transition-all duration-200 ${room.isOccupied
-                                ? 'bg-red-50 border-red-200 text-red-700'
-                                : 'bg-green-50 border-green-200 text-green-700'
-                                }`}
-                        >
-                            <span className="text-sm font-black mb-0.5">{room.number}</span>
-                            <span className="text-[10px] opacity-80 font-bold">{room.isOccupied ? '已佔用' : '空閒'}</span>
-                        </div>
-                    ))}
-                </div>
+                <RoomGrid
+                    rooms={rooms}
+                    roomOccupancy={displayOccupancy}
+                    onToggle={onToggleRoom}
+                />
             </div>
 
-            <section>
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                        新預約申請 <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-black">待處理</span>
-                    </h2>
-                    <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">{pendingBookings.length}</span>
-                </div>
-                {pendingBookings.length === 0 ? <p className="text-sm text-gray-400">目前沒有新預約</p> : pendingBookings.map(b => (
-                    <BookingItem
-                        key={b.id}
-                        booking={b}
-                        room={rooms.find(r => r.id === b.roomId)}
-                        availablePhysicalRooms={physicalRooms.filter(r => !r.isOccupied).map(r => r.number)} // Fallback to simple available check for now
-                        actionType="confirm"
-                        onAction={onAction}
-                    />
-                ))}
-            </section>
-
-            <section>
-                <h2 className="font-bold text-lg text-gray-900 mb-4">即將入住 / 已確認</h2>
-                {activeBookings.length === 0 ? <p className="text-sm text-gray-400">無已確認待入住訂單</p> : activeBookings.map(b => (
-                    <BookingItem
-                        key={b.id}
-                        booking={b}
-                        room={rooms.find(r => r.id === b.roomId)}
-                        availablePhysicalRooms={physicalRooms.map(r => r.number)}
-                        actionType="checkin"
-                        onAction={onAction}
-                        dashboardDate={dashboardDate} // Optional: Pass date if needed for highlighting
-                    />
-                ))}
-            </section>
-
-            <section className="opacity-60">
-                <h2 className="font-bold text-lg text-gray-900 mb-4">歷史/入帳紀錄</h2>
-                <div className="space-y-2">
-                    {historyBookings.length === 0 ? <p className="text-sm text-gray-400">無紀錄</p> : historyBookings.slice(0, 5).map(b => (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                            新預約申請 <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-black">待處理</span>
+                        </h2>
+                        <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">{pendingBookings.length}</span>
+                    </div>
+                    {pendingBookings.length === 0 ? <p className="text-sm text-gray-400">目前沒有新預約</p> : pendingBookings.map(b => (
                         <BookingItem
                             key={b.id}
                             booking={b}
                             room={rooms.find(r => r.id === b.roomId)}
-                            availablePhysicalRooms={[]}
+                            availablePhysicalRooms={getAvailableRoomsForBooking(b)}
+                            actionType="confirm"
                             onAction={onAction}
                         />
                     ))}
-                </div>
-            </section>
+                </section>
+
+                <section>
+                    <h2 className="font-bold text-lg text-gray-900 mb-4">即將入住 / 已確認</h2>
+                    {activeBookings.length === 0 ? <p className="text-sm text-gray-400">無已確認待入住訂單</p> : activeBookings.map(b => (
+                        <BookingItem
+                            key={b.id}
+                            booking={b}
+                            room={rooms.find(r => r.id === b.roomId)}
+                            availablePhysicalRooms={physicalRooms.map(r => r.number)}
+                            actionType="checkin"
+                            onAction={onAction}
+                            dashboardDate={dashboardDate}
+                        />
+                    ))}
+                </section>
+            </div>
+
+
         </div>
     );
 };

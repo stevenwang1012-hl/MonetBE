@@ -9,7 +9,7 @@ type HostTab = 'bookings' | 'rooms' | 'reports';
 export const HostLayout = ({
     bookings,
     rooms,
-    physicalRooms,
+    roomOccupancy,
     onAction,
     onToggleRoom,
     onUpdateRoom,
@@ -20,7 +20,7 @@ export const HostLayout = ({
 }: {
     bookings: Booking[],
     rooms: Room[],
-    physicalRooms: PhysicalRoom[],
+    roomOccupancy: Record<string, boolean>,
     onAction: (bookingId: string, action: 'confirm' | 'checkin' | 'reject' | 'pay', assignedRoom?: string) => void,
     onToggleRoom: (num: string) => void,
     onUpdateRoom: (room: Room) => void,
@@ -64,7 +64,7 @@ export const HostLayout = ({
                     <BookingManagement
                         bookings={bookings}
                         rooms={rooms}
-                        physicalRooms={physicalRooms}
+                        roomOccupancy={roomOccupancy}
                         onAction={onAction}
                         onToggleRoom={onToggleRoom}
                     />

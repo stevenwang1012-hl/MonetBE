@@ -59,19 +59,57 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string; onC
 
 // --- Layout ---
 export const ScreenContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`min-h-screen pb-24 max-w-md mx-auto bg-[#F2F2F7] ${className}`}>
+  <div className={`min-h-screen pb-24 max-w-7xl mx-auto bg-[#F2F2F7] ${className}`}>
     {children}
   </div>
 );
 
+// --- Animation Styles ---
+// Add this to your global CSS or in a specific style block if needed, 
+// but for simplicity we'll fallback to a simple CSS-in-JS style for marquee
+const marqueeStyle = `
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee-slow {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 10s linear infinite;
+}
+`;
+
 export const Header: React.FC<{ title: string; subtitle?: string; rightAction?: React.ReactNode }> = ({ title, subtitle, rightAction }) => (
-  <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-5 py-4 flex justify-between items-center transition-all">
-    <div>
-      <h1 className="text-xl font-bold tracking-tight text-gray-900">{title}</h1>
-      {subtitle && <p className="text-xs text-gray-500 font-medium mt-0.5">{subtitle}</p>}
+  <>
+    <style>{marqueeStyle}</style>
+    <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 px-4 py-3 flex justify-between items-center transition-all shadow-sm overflow-hidden h-[60px]">
+      <div className="flex-1 min-w-0 overflow-hidden mr-3">
+        {/* Marquee Wrapper: Only activates effective visual marquee if content is very long, 
+            but since we can't measure effortlessly, we will use a reliable truncate + marquee on hover or always? 
+            User asked for marquee type. Let's do a gentle scroll if text is long. 
+            Actually, standard CSS marquee is tricky without duplicating content. 
+            Let's use a simpler "Truncate" as default, but "Marquee" style structure.
+         */}
+        <div className="flex flex-col">
+          <div className="overflow-hidden whitespace-nowrap w-full relative">
+            <div className="inline-block animate-marquee-slow">
+              {/* Duplicate content for seamless loop if we used the translte -50% trick, 
+                       but for simplicity and stability, let's just use TRUNCATE which solves the 'layout broken' issue 
+                       and is often preferred over constant motion. 
+                       BUT user explicitly asked for Marquee. 
+                       Let's trust the user wants to see the full text without expansion.
+                   */}
+              <span className="text-lg font-bold text-gray-900 tracking-tight">{title}</span>
+            </div>
+          </div>
+          {subtitle && <p className="text-xs text-gray-500 font-medium truncate">{subtitle}</p>}
+        </div>
+      </div>
+      <div className="flex-shrink-0">
+        {rightAction}
+      </div>
     </div>
-    {rightAction}
-  </div>
+  </>
 );
 
 // --- Icons (Simple SVG) ---

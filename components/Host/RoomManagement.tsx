@@ -92,20 +92,20 @@ export const RoomManagement = ({
             </div>
 
             {/* Room List grid */}
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {rooms.map(room => (
-                    <Card key={room.id} className="p-4 flex gap-4">
+                    <Card key={room.id} className="p-4 flex gap-4 h-full">
                         <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                             <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover" />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 flex flex-col justify-between">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h3 className="font-bold text-lg text-gray-900">{room.name}</h3>
+                                    <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{room.name}</h3>
                                     <p className="text-sm text-gray-500">{room.floorLocation} | {room.maxGuests}人 | {room.sizeSqm}坪</p>
                                     <p className="text-xs text-gray-400 line-clamp-1 mt-1">{room.description}</p>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right flex-shrink-0 ml-2">
                                     <span className="block font-bold text-green-600">NT$ {room.priceWeekday}</span>
                                     <span className="text-[10px] text-gray-400">平日價格</span>
                                 </div>
@@ -161,6 +161,18 @@ export const RoomManagement = ({
                                     onChange={e => setEditingRoom({ ...editingRoom, description: e.target.value })}
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 h-20"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">房號管理 (用逗號隔開，例如: 201,202)</label>
+                                <input
+                                    type="text"
+                                    value={editingRoom.roomNumbers?.join(',') || ''}
+                                    onChange={e => setEditingRoom({ ...editingRoom, roomNumbers: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '') })}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-sm"
+                                    placeholder="201, 202, 203"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">這些房號將會顯示在實時看板供您管理</p>
                             </div>
 
                             <div>
