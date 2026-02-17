@@ -87,3 +87,55 @@ insert into public.rooms (room_number, room_type_id) values
 ('201', 'rt_latin'),
 ('202', 'rt_latin'),
 ('205', 'rt_latin');
+
+-- 6. Create Authorized Hosts Table (Security)
+create table public.authorized_hosts (
+  email text primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Seed Authorized Hosts
+insert into public.authorized_hosts (email) values 
+('stevenwang1012@gmail.com'),
+('monetbnb@gmail.com'),
+('monetgardenhl@gmail.com'),
+('chenwenwang1012@gmail.com');
+
+-- Enable RLS (Will be configured in next step)
+alter table public.authorized_hosts enable row level security;
+create policy "Allow public read to check access" on public.authorized_hosts for select using (true);
+
+-- 7. Configure RLS Policies for Core Tables
+-- Re-enable RLS (was disabled in Step 4)
+alter table public.room_types enable row level security;
+alter table public.rooms enable row level security;
+alter table public.bookings enable row level security;
+
+-- Helper function to check if user is an authorized host
+create or replace function public.is_admin()
+returns boolean as $$
+begin
+  return exists (
+    select 1 from public.authorized_hosts
+    where email = auth.jwt() ->> 'email'
+  );
+end;
+$$ language plpgsql security definer;
+
+-- Policies for Room Types (Public Read, Host Write)
+create policy "Room Types: Public Read" on public.room_types for select using (true);
+create policy "Room Types: Host All" on public.room_types for all using (public.is_admin());
+
+-- Policies for Rooms (Public Read, Host Write)
+create policy "Rooms: Public Read" on public.rooms for select using (true);
+create policy "Rooms: Host All" on public.rooms for all using (public.is_admin());
+
+-- Policies for Bookings
+-- Public can read (to see availability)
+create policy "Bookings: Public Read" on public.bookings for select using (true);
+-- Public can insert (to make a booking)
+create policy "Bookings: Public Insert" on public.bookings for insert with check (true);
+-- Only Host can update/delete (cancel, confirm, etc.)
+create policy "Bookings: Host Update" on public.bookings for update using (public.is_admin());
+create policy "Bookings: Host Delete" on public.bookings for delete using (public.is_admin());
+

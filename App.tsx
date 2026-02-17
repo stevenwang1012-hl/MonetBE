@@ -110,6 +110,52 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        checkHostAccess(session.user);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        checkHostAccess(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const checkHostAccess = async (authUser: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('authorized_hosts')
+        .select('email')
+        .eq('email', authUser.email)
+        .single();
+
+      if (data) {
+        console.log('Host Access Granted via DB:', authUser.email);
+        setUser({
+          id: authUser.id,
+          name: authUser.user_metadata?.full_name || 'Host',
+          role: UserRole.HOST,
+          avatar: authUser.user_metadata?.avatar_url
+        });
+        setActiveTab('dashboard');
+      } else {
+        console.log('Access Denied: Email not in authorized_hosts', authUser.email);
+        alert('您的帳號沒有管理員權限');
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.error('Error checking host access:', err);
+    }
+  };
+
+  useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
