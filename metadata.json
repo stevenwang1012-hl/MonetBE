@@ -1,0 +1,7 @@
+{
+  "name": "Serenity Stay - B&B Reservation",
+  "description": "A premium, iPhone-styled reservation system for a boutique B&B. Features LINE login integration (mock), strict regulatory room display limits, and a comprehensive Host/Guest workflow management system.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
