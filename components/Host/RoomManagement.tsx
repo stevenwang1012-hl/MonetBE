@@ -98,7 +98,7 @@ export const RoomManagement = ({
                         <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                             <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover" />
                         </div>
-                        <div className="flex-1 flex flex-col justify-between">
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{room.name}</h3>

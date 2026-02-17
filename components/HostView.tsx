@@ -8,7 +8,7 @@ import { INITIAL_PHYSICAL_ROOMS } from '../constants';
 export const RoomGrid = ({ rooms, roomOccupancy, onToggle }: { rooms: Room[], roomOccupancy: Record<string, boolean>, onToggle: (num: string) => void }) => {
     return (
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
                 <h2 className="font-bold text-lg text-gray-900">房間狀態實時看板</h2>
                 <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wider">
                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-green-500"></div>空閒中</div>
@@ -66,21 +66,21 @@ export const BookingItem: React.FC<BookingItemProps> = ({
 
     return (
         <Card className="p-4 mb-3 border-l-4 border-l-black">
-            <div className="flex justify-between items-start mb-3">
-                <div>
-                    <h4 className="font-bold text-gray-900">{booking.guestName}</h4>
-                    <p className="text-sm text-gray-500">{room?.name}</p>
+            <div className="flex justify-between items-start mb-3 gap-3">
+                <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-gray-900 truncate pr-2">{booking.guestName}</h4>
+                    <p className="text-sm text-gray-500 truncate">{room?.name}</p>
                     <p className="text-[11px] text-gray-400 mt-1">
                         期間：{booking.date} ~ {booking.endDate} ({nights}晚)
                     </p>
                     {booking.hasBreakfast && (
-                        <p className="text-[11px] font-bold text-orange-600 mt-0.5">🍳 包含早午餐 ({booking.breakfastCount || 1}人)</p>
+                        <p className="text-[11px] font-bold text-orange-600 mt-0.5 truncate">🍳 包含早午餐 ({booking.breakfastCount || 1}人)</p>
                     )}
                     {booking.totalPrice && (
                         <p className="text-[11px] font-bold text-gray-900 mt-0.5">💰 總額: NT$ {booking.totalPrice.toLocaleString()}</p>
                     )}
                 </div>
-                <div className="text-right">
+                <div className="flex-shrink-0">
                     <StatusBadge status={booking.status} />
                 </div>
             </div>
@@ -206,12 +206,12 @@ export const HostDashboard = ({
     return (
         <div className="p-4 space-y-8 pb-32">
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-8">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                     <div>
                         <h2 className="font-bold text-lg text-gray-900">房間狀態實時看板</h2>
                         <p className="text-xs text-gray-400 mt-1">檢視指定日期的房況</p>
                     </div>
-                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-1 border border-gray-200 self-start sm:self-auto">
                         <button
                             onClick={() => {
                                 const d = new Date(dashboardDate);
@@ -250,9 +250,9 @@ export const HostDashboard = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <section>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-wrap items-center justify-between mb-4 gap-2">
                         <h2 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                            新預約申請 <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-black">待處理</span>
+                            新預約申請 <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase font-black whitespace-nowrap">待處理</span>
                         </h2>
                         <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">{pendingBookings.length}</span>
                     </div>

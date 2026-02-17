@@ -98,12 +98,12 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, onBook, che
                                 className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 pointer-events-none"></div>
-                            <div className="absolute bottom-0 left-0 p-5 w-full pointer-events-none">
-                                <h3 className="font-bold text-2xl text-white tracking-tight leading-tight">{room.name}</h3>
+                            <div className="absolute bottom-0 left-0 p-4 md:p-5 w-full pointer-events-none">
+                                <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight leading-tight">{room.name}</h3>
                             </div>
                         </div>
 
-                        <div className="p-5">
+                        <div className="p-4 md:p-5">
                             <div className="flex flex-wrap gap-2 mb-4">
                                 <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-md border border-blue-100">
                                     {room.bedConfig}
