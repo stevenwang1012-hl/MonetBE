@@ -94,8 +94,8 @@ export const RoomManagement = ({
             {/* Room List grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {rooms.map(room => (
-                    <Card key={room.id} className="p-4 flex gap-4 h-full">
-                        <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                    <Card key={room.id} className="p-4 flex flex-col sm:flex-row gap-4 h-full">
+                        <div className="w-full h-48 sm:w-24 sm:h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                             <img src={room.images[0]} alt={room.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col justify-between">
