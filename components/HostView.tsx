@@ -191,8 +191,7 @@ export const HostDashboard = ({
         const targetRoom = rooms.find(r => r.id === targetBooking.roomId);
         if (!targetRoom || !targetRoom.roomNumbers) return [];
 
-        // Find overlapping bookings that are confirmed/paid/checked-in/checked-out(today?? no)
-        // Overlap logic: (StartA < EndB) && (EndA > StartB)
+        // Find overlapping bookings that are confirmed/paid/checked-in/blocked
         const overlappingBookings = bookings.filter(b =>
             b.id !== targetBooking.id && // exclude self
             (b.status === BookingStatus.CONFIRMED || b.status === BookingStatus.PAID || b.status === BookingStatus.CHECKED_IN || b.status === BookingStatus.BLOCKED) &&
@@ -200,8 +199,8 @@ export const HostDashboard = ({
             (b.date < targetBooking.endDate && b.endDate > targetBooking.date) // active overlap
         );
 
-        const occupiedNumbers = new Set(overlappingBookings.map(b => b.assignedPhysicalRoom));
-        return targetRoom.roomNumbers.filter(num => !occupiedNumbers.has(num));
+        const occupiedNumbers = new Set(overlappingBookings.map(b => String(b.assignedPhysicalRoom).trim()));
+        return targetRoom.roomNumbers.filter(num => !occupiedNumbers.has(String(num).trim()));
     };
 
     return (

@@ -7,6 +7,9 @@ import { getDiffDays, calculateTotalPrice } from './utils';
 import { migrateRoomsToSupabase } from './utils/migration';
 
 // Components
+import liff from '@line/liff';
+
+// Components
 import { LoginScreen } from './components/LoginScreen';
 import { RoomList, GuestHistory } from './components/GuestView';
 import { HostLayout } from './components/Host/HostLayout';
@@ -27,6 +30,7 @@ export default function App() {
   const [roomOccupancy, setRoomOccupancy] = useState<Record<string, boolean>>({});
   const [breakfastPrice, setBreakfastPrice] = useState<number>(220);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // --- Initial Data Fetching (Supabase) ---
   const fetchRooms = async () => {
@@ -167,14 +171,59 @@ export default function App() {
     }
   };
 
+  // --- Auth Initialization ---
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+      setIsAuthChecking(true);
+      // 1. Check Supabase (Host Session)
+      const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        checkHostAccess(session.user);
+        await checkHostAccess(session.user);
+        setIsAuthChecking(false);
+        return;
       }
-    });
 
+      // 2. Check Host Mode URL
+      const isHostMode = new URLSearchParams(window.location.search).get('role') === 'host';
+      if (isHostMode) {
+        // Stay logged out to show LoginScreen
+        setIsAuthChecking(false);
+        return;
+      }
+
+      // 3. Init LIFF (Auto Login for LINE Browser)
+      try {
+        const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID;
+        if (LIFF_ID) {
+          await liff.init({ liffId: LIFF_ID });
+
+          if (liff.isLoggedIn()) {
+            // Already logged in (Desktop with cookie, or LINE App)
+            const profile = await liff.getProfile();
+            handleLogin(UserRole.GUEST, profile);
+          } else if (liff.isInClient()) {
+            // In LINE App but not logged in? Force login to ensure "Auto Login" experience
+            // This will trigger the LINE consent screen if first time, or auto-login if authorized
+            liff.login({ redirectUri: window.location.href });
+            return; // Stop here, redirect will happen
+          } else {
+            // Desktop / External Browser AND Not Logged In
+            // Show Login Screen (User explicitly requested this distinction)
+          }
+        } else {
+          console.warn('VITE_LINE_LIFF_ID not found');
+        }
+      } catch (e) {
+        console.error('LIFF Init Failed:', e);
+        // On error, let them see Login Screen so they aren't stuck on white screen
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
+
+    initAuth();
+
+    // Supabase Auth Listener (Host)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -443,6 +492,17 @@ export default function App() {
     }
   };
 
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
+          <div className="h-4 w-32 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
   if (user.role === UserRole.GUEST) {
@@ -456,8 +516,20 @@ export default function App() {
       <ScreenContainer>
         <div className="sticky top-0 z-50">
           {(() => {
-            console.log('Current User Avatar:', user.avatar);
-            const AvatarIcon = user.avatar ? (
+            const isAnonymous = user.id === 'guest'; // specific ID for anonymous/guest fallbacks
+            const AvatarIcon = isAnonymous ? (
+              <button
+                onClick={() => {
+                  // Trigger LIFF Login
+                  if (liff.isInClient() || !liff.isLoggedIn()) {
+                    liff.login();
+                  }
+                }}
+                className="bg-black text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-gray-800 transition-colors"
+              >
+                登入 / 註冊
+              </button>
+            ) : user.avatar ? (
               <img src={user.avatar} className="w-8 h-8 rounded-full bg-gray-200 border border-white shadow-sm object-cover" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-gray-200 border border-white shadow-sm flex items-center justify-center">
