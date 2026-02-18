@@ -82,28 +82,85 @@ export default function App() {
     }
   };
 
-  const fetchBookings = async () => {
-    try {
-      const { data: bookingsData, error: bError } = await supabase.from('bookings').select('*');
-      if (bError) throw bError;
+  const fetchBookings = async (currentUser?: User | null) => {
+    // Resolve user: passed arg -> state -> null
+    const targetUser = currentUser !== undefined ? currentUser : user;
 
-      if (bookingsData) {
-        const formattedBookings: Booking[] = bookingsData.map((b: any) => ({
-          id: b.id,
-          roomId: b.room_type_id,
-          userId: b.user_id,
-          guestName: b.guest_name,
-          date: b.check_in_date,
-          endDate: b.check_out_date,
-          status: b.status,
-          createdAt: new Date(b.created_at).getTime(),
-          assignedPhysicalRoom: b.assigned_room_number || undefined,
-          hasBreakfast: false, // Default for now
-          breakfastCount: 0,
-          totalPrice: 0
-        }));
-        setBookings(formattedBookings);
+    try {
+      let formattedBookings: Booking[] = [];
+
+      if (targetUser?.role === UserRole.HOST) {
+        // HOST: Full Access (via RLS)
+        const { data: bookingsData, error: bError } = await supabase.from('bookings').select('*');
+        if (bError) throw bError;
+
+        if (bookingsData) {
+          formattedBookings = bookingsData.map((b: any) => ({
+            id: b.id,
+            roomId: b.room_type_id,
+            userId: b.user_id,
+            guestName: b.guest_name,
+            date: b.check_in_date,
+            endDate: b.check_out_date,
+            status: b.status,
+            createdAt: new Date(b.created_at).getTime(),
+            assignedPhysicalRoom: b.assigned_room_number || undefined,
+            hasBreakfast: false,
+            breakfastCount: 0,
+            totalPrice: 0
+          }));
+        }
+      } else {
+        // GUEST OR ANONYMOUS: Restricted Access via RPC
+
+        // 1. Fetch Availability (Anonymized)
+        const { data: calendarData, error: cError } = await supabase.rpc('get_calendar_events');
+        if (cError) throw cError;
+
+        if (calendarData) {
+          formattedBookings = calendarData.map((b: any) => ({
+            id: `anon_${Math.random().toString(36).substr(2, 9)}`, // Fake ID to prevent actions
+            roomId: b.room_type_id,
+            userId: 'anonymous',
+            guestName: 'Reserved',
+            date: b.check_in_date,
+            endDate: b.check_out_date,
+            status: b.status,
+            createdAt: 0,
+            assignedPhysicalRoom: undefined,
+            hasBreakfast: false,
+            breakfastCount: 0,
+            totalPrice: 0
+          }));
+        }
+
+        // 2. Fetch "My Trips" (If Guest Logged In)
+        if (targetUser?.role === UserRole.GUEST && targetUser.lineId) {
+          const { data: myData, error: myError } = await supabase.rpc('get_user_bookings', { line_user_id: targetUser.lineId });
+          if (myError) throw myError;
+
+          if (myData) {
+            const myBookings = myData.map((b: any) => ({
+              id: b.id,
+              roomId: b.room_type_id,
+              userId: b.user_id,
+              guestName: b.guest_name,
+              date: b.check_in_date,
+              endDate: b.check_out_date,
+              status: b.status,
+              createdAt: new Date(b.created_at).getTime(),
+              assignedPhysicalRoom: b.assigned_room_number || undefined,
+              hasBreakfast: false,
+              breakfastCount: 0,
+              totalPrice: 0
+            }));
+            // Combine: My Trips + Anonymous Availability
+            formattedBookings = [...formattedBookings, ...myBookings];
+          }
+        }
       }
+
+      setBookings(formattedBookings);
     } catch (error) {
       console.error('Error fetching bookings:', error);
     }
@@ -160,7 +217,7 @@ export default function App() {
       setIsLoading(true);
       try {
         await fetchRooms();
-        await fetchBookings();
+        await fetchBookings(user);
       } catch (error) {
         console.error('Error fetching data from Supabase:', error);
       } finally {
@@ -170,7 +227,7 @@ export default function App() {
     fetchData();
 
     // Removed Supabase Auth Listener (Using LIFF for now)
-  }, []); // Only run once on mount
+  }, [user]); // Re-fetch when user role/identity changes
 
   // --- Realtime Subscription (Simplified Reuse) ---
   // Ideally use supabase.channel here to listen for changes

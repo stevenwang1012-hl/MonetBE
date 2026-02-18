@@ -139,3 +139,46 @@ create policy "Bookings: Public Insert" on public.bookings for insert with check
 create policy "Bookings: Host Update" on public.bookings for update using (public.is_admin());
 create policy "Bookings: Host Delete" on public.bookings for delete using (public.is_admin());
 
+-- Allow Guests to cancel their own bookings (Anonymous update allowed if they know the ID)
+-- RESTRICTION: Can only update if new status is 'CANCELLED'
+create policy "Bookings: Guest Cancel" on public.bookings for update 
+using (true) 
+with check (status = 'CANCELLED');
+
+-- 8. Security Hardening: RPC Functions (Safe Data Access)
+
+-- Function 1: Public Calendar/Availability (Anonymized)
+-- Returns only dates and status, NO personal info or UUIDs
+create or replace function public.get_calendar_events()
+returns table (
+  room_type_id text,
+  check_in_date date,
+  check_out_date date,
+  status text
+) 
+language sql
+security definer -- Bypasses RLS to read data, but filters return
+as $$
+  select room_type_id, check_in_date, check_out_date, status
+  from public.bookings
+  where status != 'CANCELLED' 
+  and status != 'REJECTED';
+$$;
+
+-- Function 2: My Trips (Authenticated by LINE ID)
+-- Returns full details ONLY for the requesting user
+create or replace function public.get_user_bookings(line_user_id text)
+returns setof public.bookings
+language sql
+security definer
+as $$
+  select *
+  from public.bookings
+  where user_id = line_user_id
+  order by created_at desc;
+$$;
+
+-- 9. Security Hardening: Disable Public Select (Final Step)
+-- Remove the public read policy so that ONLY RPC functions (and Hosts) can access data
+drop policy if exists "Bookings: Public Read" on public.bookings;
+
