@@ -15,42 +15,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     // Check URL query param for host login mode
     const isHostMode = new URLSearchParams(window.location.search).get('role') === 'host';
 
-    const isInitialized = React.useRef(false);
-
-    useEffect(() => {
-        if (isInitialized.current) return;
-        isInitialized.current = true;
-
-        const initLiff = async () => {
-            try {
-                const LIFF_ID = import.meta.env.VITE_LINE_LIFF_ID || 'YOUR_LIFF_ID_HERE';
-                if (LIFF_ID === 'YOUR_LIFF_ID_HERE') {
-                    console.log('LIFF ID not set');
-                    return;
-                }
-
-                console.log('Initializing LIFF...');
-                await liff.init({ liffId: LIFF_ID });
-                console.log('LIFF Initialized. isLoggedIn:', liff.isLoggedIn());
-
-                // If in Host Mode, DO NOT auto-login as guest even if LIFF is persisted
-                if (!isHostMode && liff.isLoggedIn()) {
-                    const profile = await liff.getProfile();
-                    console.log('LIFF Profile:', profile);
-                    onLogin(UserRole.GUEST, profile);
-                } else {
-                    console.log('LIFF not logged in or in Host Mode');
-                }
-            } catch (error: any) {
-                console.error('LIFF Init failed', error);
-                setLiffError(error.message);
-            }
-        };
-
-        if (import.meta.env.VITE_LINE_LIFF_ID) {
-            initLiff();
-        }
-    }, [onLogin, isHostMode]);
+    // Note: LIFF init is now handled in App.tsx. LoginScreen assumes LIFF is ready or failed.
+    // We only access liff global object here for login actions.
 
     const handleGoogleLogin = async () => {
         try {
