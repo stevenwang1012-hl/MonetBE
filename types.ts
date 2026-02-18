@@ -37,6 +37,7 @@ export interface Room {
   roomNumbers?: string[]; // Physical room numbers (e.g. ['201', '202'])
   // Calculated fields for compatibility or display
   price?: number; // Optional, might be deprecated or used as 'display price'
+  specs?: string; // Flexible room specifications (e.g. "樓下 30坪")
   tags?: string[]; // Kept for UI compatibility
 }
 

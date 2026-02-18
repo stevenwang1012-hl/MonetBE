@@ -36,7 +36,7 @@ create table public.bookings (
   guest_name text not null,
   check_in_date date not null,
   check_out_date date not null,
-  status text not null check (status in ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CANCELLED', 'REJECTED')),
+  status text not null check (status in ('PENDING', 'CONFIRMED', 'CHECKED_IN', 'CANCELLED', 'REJECTED', 'BLOCKED', 'PAID')),
   assigned_room_number text references public.rooms(room_number), -- Optional until confirmed
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

@@ -55,6 +55,7 @@ export default function App() {
             priceCny: rt.price_cny,
             price: rt.price_weekday, // Default to weekday
             description: rt.description,
+            specs: rt.specs || '', // Map new specs field
             images: (() => {
               if (!rt.image_url) return [];
               try {
@@ -537,7 +538,7 @@ export default function App() {
           )}
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-lg border-t border-gray-200 pb-safe pt-2 px-6 flex justify-around items-center z-50 h-20 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
+        <div className="fixed bottom-0 left-0 right-0 max-w-7xl mx-auto bg-white/90 backdrop-blur-lg border-t border-gray-200 pb-safe pt-2 px-6 flex justify-around items-center z-50 h-20 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
           <button onClick={() => setActiveTab('explore')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'explore' ? 'text-black' : 'text-gray-400'}`}>
             <Icons.Home className="w-6 h-6" />
             <span className="text-[10px] font-bold">預約房型</span>
@@ -660,7 +661,21 @@ export default function App() {
       <Header
         title="商家管理中心"
         subtitle="Serenity Stay Manager (中文版)"
-        rightAction={<div className="text-[10px] font-black bg-black text-white px-2 py-1 rounded uppercase tracking-tighter">管理員</div>}
+        rightAction={
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] font-black bg-black text-white px-2 py-1 rounded uppercase tracking-tighter">管理員</div>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+                setUser(null);
+                window.location.reload();
+              }}
+              className="text-xs text-gray-500 hover:text-red-600 font-bold px-2"
+            >
+              登出
+            </button>
+          </div>
+        }
       />
       <HostLayout
         bookings={bookings}
