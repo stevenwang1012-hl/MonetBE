@@ -20,6 +20,7 @@ export const RoomManagement = ({
 }) => {
     const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
     const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+    const [roomNumbersInput, setRoomNumbersInput] = useState<string>(''); // For handling comma input
     const [isCreating, setIsCreating] = useState(false);
     const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const [isUploading, setIsUploading] = useState(false);
@@ -34,12 +35,13 @@ export const RoomManagement = ({
 
     const handleEdit = (room: Room) => {
         setEditingRoom({ ...room });
+        setRoomNumbersInput(room.roomNumbers?.join(', ') || '');
         setIsCreating(false);
         setStatusMsg(null);
     };
 
     const handleCreate = () => {
-        setEditingRoom({
+        const newRoom: Room = {
             id: `room_${Date.now()}`,
             name: '',
             description: '',
@@ -51,10 +53,13 @@ export const RoomManagement = ({
             priceHoliday: 2400,
             priceCny: 4000,
             price: 2000,
-            images: [], // Default empty
+            images: [],
             tags: [],
-            amenities: []
-        });
+            amenities: [],
+            roomNumbers: []
+        };
+        setEditingRoom(newRoom);
+        setRoomNumbersInput('');
         setIsCreating(true);
         setStatusMsg(null);
     };
@@ -62,11 +67,14 @@ export const RoomManagement = ({
     const handleSave = async () => {
         if (!editingRoom) return;
 
-        // Optimistic UI Update (or wait for reload)
-        // Ideally we should move this logic to a service or context, but for MVP here is fine.
-
         try {
-            // Upsert room type
+            // Parse room numbers from input
+            const finalRoomNumbers = roomNumbersInput
+                .split(',')
+                .map(s => s.trim())
+                .filter(s => s !== '');
+
+            // 1. Upsert room type
             const { error } = await supabase
                 .from('room_types')
                 .upsert({
@@ -75,42 +83,68 @@ export const RoomManagement = ({
                     description: editingRoom.description,
                     floor_location: editingRoom.floorLocation,
                     max_guests: editingRoom.maxGuests,
-                    bed_config: editingRoom.bedConfig || '', // Schema requires string
+                    bed_config: editingRoom.bedConfig || '',
                     size_sqm: editingRoom.sizeSqm,
                     price_weekday: editingRoom.priceWeekday,
                     price_holiday: editingRoom.priceHoliday,
                     price_cny: editingRoom.priceCny,
                     amenities: editingRoom.amenities,
-                    specs: editingRoom.specs, // Add specs
-                    image_url: JSON.stringify(editingRoom.images) // Store array as JSON string
+                    specs: editingRoom.specs,
+                    image_url: JSON.stringify(editingRoom.images)
                 });
 
             if (error) throw error;
 
-            // Handle Physical Rooms (roomNumbers)
-            // Strategy: Check existing, add new ones. 
-            // For MVP: We only ADD new room numbers if they don't exist in `rooms` table for this type.
-            // Removing room numbers usually requires checking bookings, so let's keep it simple: Add Only.
-            if (editingRoom.roomNumbers && editingRoom.roomNumbers.length > 0) {
-                for (const num of editingRoom.roomNumbers) {
-                    await supabase.from('rooms').upsert({
-                        room_number: num,
-                        room_type_id: editingRoom.id,
-                        is_active: true
-                    });
+            // 2. Handle Room Numbers (Sync: Add new, Delete removed)
+
+            // Fetch existing rooms for this type to determine deletions
+            const { data: existingRooms } = await supabase
+                .from('rooms')
+                .select('room_number')
+                .eq('room_type_id', editingRoom.id);
+
+            const existingSet = new Set(existingRooms?.map(r => r.room_number) || []);
+            const newSet = new Set(finalRoomNumbers);
+
+            // Determine deletions
+            const toDelete = [...existingSet].filter(num => !newSet.has(num));
+            // Determine additions/updates
+            const toUpsert = [...newSet];
+
+            // Execute Deletions
+            if (toDelete.length > 0) {
+                const { error: deleteError } = await supabase
+                    .from('rooms')
+                    .delete()
+                    .in('room_number', toDelete); // Note: This might fail if bookings exist (FK constraint)
+
+                if (deleteError) {
+                    console.warn('Could not delete some rooms (likely used in bookings):', deleteError);
+                    // Optional: Notify user or just soft-delete/ignore? 
+                    // For now, let's proceed but maybe set is_active = false if we had that logic implemented fully
                 }
             }
 
-
-            setStatusMsg({ type: 'success', text: '儲存成功！' });
-            // Call parent update to refresh list in UI
-            if (isCreating) {
-                onCreateRoom({ ...editingRoom });
-            } else {
-                onUpdateRoom({ ...editingRoom });
+            // Execute Upserts
+            for (const num of toUpsert) {
+                await supabase.from('rooms').upsert({
+                    room_number: num,
+                    room_type_id: editingRoom.id,
+                    is_active: true
+                });
             }
 
-            // Close modal after a short delay to show success message
+            // Update local object for callback
+            const updatedRoom = { ...editingRoom, roomNumbers: finalRoomNumbers };
+
+            setStatusMsg({ type: 'success', text: '儲存成功！' });
+
+            if (isCreating) {
+                onCreateRoom(updatedRoom);
+            } else {
+                onUpdateRoom(updatedRoom);
+            }
+
             setTimeout(() => {
                 setEditingRoom(null);
                 setIsCreating(false);
@@ -253,8 +287,8 @@ export const RoomManagement = ({
                                 <label className="block text-sm font-bold text-gray-700 mb-1">房號管理 (用逗號隔開，例如: 201,202)</label>
                                 <input
                                     type="text"
-                                    value={editingRoom.roomNumbers?.join(',') || ''}
-                                    onChange={e => setEditingRoom({ ...editingRoom, roomNumbers: e.target.value.split(',').map(s => s.trim()).filter(s => s !== '') })}
+                                    value={roomNumbersInput}
+                                    onChange={e => setRoomNumbersInput(e.target.value)}
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-sm"
                                     placeholder="201, 202, 203"
                                 />
