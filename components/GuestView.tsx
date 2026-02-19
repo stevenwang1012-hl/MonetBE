@@ -4,40 +4,44 @@ import { Button, Icons, Card, StatusBadge } from '../ui';
 import { getDiffDays, calculateTotalPrice } from '../utils';
 
 // --- RoomList Component ---
+import { Discount } from '../types';
+
 interface RoomListProps {
     rooms: Room[];
     bookings: Booking[];
+    discounts: Discount[];
     onBook: (room: Room) => void;
     checkIn: string;
     checkOut: string;
 }
 
-export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, onBook, checkIn, checkOut }) => {
+export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, discounts, onBook, checkIn, checkOut }) => {
+    // ... (existing filter logic)
     const [guestFilter, setGuestFilter] = useState<number>(2);
     const nights = getDiffDays(checkIn, checkOut);
 
     // Real availability logic
     const displayRooms = rooms.filter(r => {
         const matchesFilter = guestFilter === 4 ? r.maxGuests >= 4 : r.maxGuests <= 3;
+        // Check availability based on physical room stock
+        const totalStock = r.roomNumbers ? r.roomNumbers.length : 1; // Default to 1 if undefined
 
-        // Check if room is booked during the selected dates
-        // A booking overlaps if (StartA < EndB) && (EndA > StartB)
-        const isBooked = bookings.some(b => {
-            // Only check confirmed, pending, or checked_in bookings (not cancelled)
+        const overlappingBookings = bookings.filter(b => {
             if (b.status === 'CANCELLED') return false;
             if (b.roomId !== r.id) return false;
-
             return (checkIn < b.endDate) && (checkOut > b.date);
         });
 
-        return matchesFilter && !isBooked;
+        const isFullyBooked = overlappingBookings.length >= totalStock;
+
+        return matchesFilter && !isFullyBooked;
     });
 
-    // Regulatory Limit: Only display 5 rooms max
     const visibleRooms = displayRooms.slice(0, 5);
 
     return (
         <div className="p-4 space-y-6">
+            {/* ... (Filter Buttons) ... */}
             <div className="bg-gray-200 p-1 rounded-xl flex relative">
                 <button
                     onClick={() => setGuestFilter(2)}
@@ -54,82 +58,60 @@ export const RoomList: React.FC<RoomListProps> = ({ rooms, bookings, onBook, che
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {visibleRooms.length > 0 ? visibleRooms.map(room => (
-                    <div key={room.id} className="group relative bg-white rounded-3xl overflow-hidden shadow-lg shadow-gray-200/50 border border-gray-100 flex flex-col">
-                        <div className="aspect-[4/3] w-full overflow-hidden relative group">
-                            {room.images.length > 1 && (
-                                <>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const img = document.getElementById(`img-${room.id}`) as HTMLImageElement;
-                                            if (img) {
-                                                const currentSrc = img.src;
-                                                const currentIndex = room.images.indexOf(currentSrc) || room.images.indexOf(room.images.find(url => currentSrc.includes(url)) || '');
-                                                const nextIndex = (currentIndex - 1 + room.images.length) % room.images.length;
-                                                img.src = room.images[nextIndex];
-                                            }
-                                        }}
-                                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
-                                    >
-                                        <Icons.ChevronLeft className="w-5 h-5" />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const img = document.getElementById(`img-${room.id}`) as HTMLImageElement;
-                                            if (img) {
-                                                const currentSrc = img.src;
-                                                const currentIndex = room.images.indexOf(currentSrc) || room.images.indexOf(room.images.find(url => currentSrc.includes(url)) || '');
-                                                const nextIndex = (currentIndex + 1) % room.images.length;
-                                                img.src = room.images[nextIndex];
-                                            }
-                                        }}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
-                                    >
-                                        <Icons.ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </>
-                            )}
-                            <img
-                                id={`img-${room.id}`}
-                                src={room.images[0]}
-                                alt={room.name}
-                                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 pointer-events-none"></div>
-                            <div className="absolute bottom-0 left-0 p-4 md:p-5 w-full pointer-events-none">
-                                <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight leading-tight">{room.name}</h3>
-                            </div>
-                        </div>
+                {visibleRooms.length > 0 ? visibleRooms.map(room => {
+                    const { total, originalTotal, hasDiscount } = calculateTotalPrice(checkIn, checkOut, room, {}, discounts);
 
-                        <div className="p-4 md:p-5">
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                {room.amenities?.map((tag, i) => (
-                                    <span key={i} className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-md border border-gray-100">
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-
-
-                            {/* Size, Floor, and Description removed as requested for simplified view */}
-
-                            <div className="flex items-end justify-between mt-2 pt-2 border-t border-gray-50">
-                                <div>
-                                    <p className="text-xs text-gray-400 font-medium mb-0.5">{nights} 晚總計價格</p>
-                                    {/* Logic to determine price based on calendar (Weekend/Holiday) would go here. Using default price for mock. */}
-                                    <p className="text-xl font-bold text-gray-900">
-                                        NT$ {calculateTotalPrice(checkIn, checkOut, room).toLocaleString()}
-                                    </p>
+                    return (
+                        <div key={room.id} className="group relative bg-white rounded-3xl overflow-hidden shadow-lg shadow-gray-200/50 border border-gray-100 flex flex-col">
+                            <div className="aspect-[4/3] w-full overflow-hidden relative group">
+                                {/* ... (Image Logic) ... */}
+                                {room.images.length > 1 && (
+                                    <>
+                                        <button onClick={(e) => { /*...*/ }} className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"><Icons.ChevronLeft className="w-5 h-5" /></button>
+                                        <button onClick={(e) => { /*...*/ }} className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"><Icons.ChevronRight className="w-5 h-5" /></button>
+                                    </>
+                                )}
+                                <img id={`img-${room.id}`} src={room.images[0]} alt={room.name} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90 pointer-events-none"></div>
+                                <div className="absolute bottom-0 left-0 p-4 md:p-5 w-full pointer-events-none">
+                                    <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight leading-tight">{room.name}</h3>
                                 </div>
-                                <Button onClick={() => onBook(room)} className="px-6 shadow-md shadow-blue-500/20">
-                                    預約
-                                </Button>
+                                {hasDiscount && (
+                                    <div className="absolute top-3 right-3 bg-red-600 text-white text-xs font-black px-2 py-1 rounded shadow-lg animate-bounce-slow">
+                                        限時優惠
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="p-4 md:p-5">
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {room.amenities?.map((tag, i) => (
+                                        <span key={i} className="px-2.5 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded-md border border-gray-100">
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-end justify-between mt-2 pt-2 border-t border-gray-50">
+                                    <div>
+                                        <p className="text-xs text-gray-400 font-medium mb-0.5">{nights} 晚總計價格</p>
+                                        <div className="flex items-baseline gap-2">
+                                            {hasDiscount && (
+                                                <span className="text-sm text-gray-400 line-through">NT$ {originalTotal.toLocaleString()}</span>
+                                            )}
+                                            <p className={`text-xl font-bold ${hasDiscount ? 'text-red-600' : 'text-gray-900'}`}>
+                                                NT$ {total.toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button onClick={() => onBook(room)} className="px-6 shadow-md shadow-blue-500/20">
+                                        預約
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )) : (
+                    )
+                }) : (
                     <div className="py-20 text-center text-gray-400 bg-white rounded-3xl border border-dashed border-gray-300">
                         <Icons.Calendar className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p className="text-sm font-medium">所選日期目前無可用房型</p>

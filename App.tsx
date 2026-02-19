@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { User, UserRole, Booking, BookingStatus, Room, PhysicalRoom } from './types';
+import { User, UserRole, Booking, BookingStatus, Room, PhysicalRoom, Discount } from './types';
 import { MOCK_USER_GUEST, MOCK_USER_HOST, ROOMS, INITIAL_BOOKINGS, INITIAL_PHYSICAL_ROOMS } from './constants';
 import { Button, ScreenContainer, Header, Icons } from './ui';
 import { getDiffDays, calculateTotalPrice } from './utils';
 import { migrateRoomsToSupabase } from './utils/migration';
-
-// Components
 import liff from '@line/liff';
-
-// Components
 import { LoginScreen } from './components/LoginScreen';
 import { RoomList, GuestHistory } from './components/GuestView';
 import { HostLayout } from './components/Host/HostLayout';
 
-// --- Main App ---
 export default function App() {
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
@@ -27,6 +22,7 @@ export default function App() {
   // Data State
   const [rooms, setRooms] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]); // Added
   const [roomOccupancy, setRoomOccupancy] = useState<Record<string, boolean>>({});
   const [breakfastPrice, setBreakfastPrice] = useState<number>(220);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,6 +80,20 @@ export default function App() {
       // Fallback
       const savedRooms = localStorage.getItem('monetBB_rooms');
       if (savedRooms) setRooms(JSON.parse(savedRooms));
+    }
+  };
+
+  const fetchDiscounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('room_discounts')
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setDiscounts(data || []);
+    } catch (error) {
+      console.error('Error fetching discounts:', error);
     }
   };
 
@@ -267,6 +277,7 @@ export default function App() {
       setIsLoading(true);
       try {
         await fetchRooms();
+        await fetchDiscounts();
         await fetchBookings(user);
       } catch (error) {
         console.error('Error fetching data from Supabase:', error);
@@ -607,7 +618,14 @@ export default function App() {
 
         <main className="pt-2">
           {activeTab === 'explore' ? (
-            <RoomList rooms={rooms} bookings={bookings} onBook={setShowBookingModal} checkIn={checkIn} checkOut={checkOut} />
+            <RoomList
+              rooms={rooms}
+              bookings={bookings}
+              discounts={discounts}
+              onBook={setShowBookingModal}
+              checkIn={checkIn}
+              checkOut={checkOut}
+            />
           ) : (
             <GuestHistory bookings={myBookings} rooms={rooms} onCancel={handleCancelBooking} />
           )}
@@ -654,7 +672,7 @@ export default function App() {
                           ))}
                         </div>
                         <p className="text-gray-900 font-bold text-lg mt-1">
-                          NT$ {calculateTotalPrice(checkIn, checkOut, currentBookingRoom, { hasBreakfast: addBreakfast, guests: breakfastCount }).toLocaleString()}
+                          NT$ {calculateTotalPrice(checkIn, checkOut, currentBookingRoom, { hasBreakfast: addBreakfast, guests: breakfastCount }, discounts).total.toLocaleString()}
                         </p>
                       </div>
                     </>

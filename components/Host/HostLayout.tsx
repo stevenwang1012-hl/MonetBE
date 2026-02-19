@@ -3,8 +3,9 @@ import { Booking, Room, PhysicalRoom } from '../../types';
 import { BookingManagement } from './BookingManagement';
 import { RoomManagement } from './RoomManagement';
 import { ReportAnalysis } from './ReportAnalysis';
+import { DiscountManagement } from './DiscountManagement';
 
-type HostTab = 'bookings' | 'rooms' | 'reports';
+type HostTab = 'bookings' | 'rooms' | 'reports' | 'discounts';
 
 export const HostLayout = ({
     bookings,
@@ -34,7 +35,7 @@ export const HostLayout = ({
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Tab Navigation */}
-            <div className="sticky top-[76px] z-30 bg-white border-b border-gray-100 flex px-4 gap-6 overflow-x-auto">
+            <div className="sticky top-0 z-30 bg-white border-b border-gray-100 flex px-4 gap-6 overflow-x-auto">
                 <button
                     onClick={() => setActiveTab('bookings')}
                     className={`py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'bookings' ? 'text-black border-black' : 'text-gray-400 border-transparent'
@@ -48,6 +49,13 @@ export const HostLayout = ({
                         }`}
                 >
                     房型管理
+                </button>
+                <button
+                    onClick={() => setActiveTab('discounts')}
+                    className={`py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'discounts' ? 'text-black border-black text-red-600' : 'text-gray-400 border-transparent'
+                        }`}
+                >
+                    優惠中心
                 </button>
                 <button
                     onClick={() => setActiveTab('reports')}
@@ -78,6 +86,9 @@ export const HostLayout = ({
                         breakfastPrice={breakfastPrice}
                         onUpdateBreakfastPrice={onUpdateBreakfastPrice}
                     />
+                )}
+                {activeTab === 'discounts' && (
+                    <DiscountManagement rooms={rooms} />
                 )}
                 {activeTab === 'reports' && (
                     <ReportAnalysis

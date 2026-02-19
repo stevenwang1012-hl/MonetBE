@@ -61,3 +61,13 @@ export interface PhysicalRoom {
   isOccupied: boolean;
   notes?: string;
 }
+
+export interface Discount {
+  id: string;
+  room_type_id: string;
+  start_date: string;
+  end_date: string;
+  discount_value: number; // 10 = 10% off
+  name?: string;
+  is_active: boolean;
+}

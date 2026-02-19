@@ -225,8 +225,13 @@ export const HostDashboard = ({
                         <input
                             type="date"
                             value={dashboardDate}
+                            onClick={(e) => {
+                                try {
+                                    e.currentTarget.showPicker();
+                                } catch (err) { }
+                            }}
                             onChange={(e) => setDashboardDate(e.target.value)}
-                            className="bg-transparent border-none text-sm font-bold text-gray-700 focus:ring-0 p-0 w-28 text-center"
+                            className="bg-transparent border-none text-sm font-bold text-gray-700 focus:ring-0 p-0 w-28 text-center cursor-pointer"
                         />
                         <button
                             onClick={() => {

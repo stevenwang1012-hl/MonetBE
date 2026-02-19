@@ -40,7 +40,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 return;
             }
             if (!liff.isInClient() && !liff.isLoggedIn()) {
-                liff.login();
+                liff.login({ redirectUri: window.location.href });
             } else if (liff.isLoggedIn()) {
                 const profile = await liff.getProfile();
                 onLogin(UserRole.GUEST, profile);

@@ -32,8 +32,13 @@ export const ReportAnalysis = ({
                 <input
                     type="month"
                     value={selectedMonth}
+                    onClick={(e) => {
+                        try {
+                            e.currentTarget.showPicker();
+                        } catch (err) { }
+                    }}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-700 bg-white shadow-sm"
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-bold text-gray-700 bg-white shadow-sm cursor-pointer"
                 />
             </div>
 
