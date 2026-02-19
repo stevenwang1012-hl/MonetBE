@@ -494,10 +494,13 @@ export default function App() {
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-12 h-12 bg-gray-200 rounded-full mb-4"></div>
-          <div className="h-4 w-32 bg-gray-200 rounded"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <div className="flex flex-col items-center animate-pulse">
+          <div className="w-16 h-16 bg-gray-900 rounded-3xl flex items-center justify-center mb-6 shadow-xl">
+            <Icons.Home className="text-white w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">花蓮莫內花園咖啡農莊</h2>
+          <p className="text-sm text-gray-400 font-medium">系統載入中...</p>
         </div>
       </div>
     );

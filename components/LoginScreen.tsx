@@ -55,7 +55,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <div className="w-24 h-24 bg-gray-900 rounded-3xl mb-8 flex items-center justify-center shadow-2xl">
                 <Icons.Home className="text-white w-12 h-12" />
             </div>
-            <h1 className="text-3xl font-bold mb-2 tracking-tight">Serenity Stay</h1>
+            <h1 className="text-2xl font-bold mb-2 tracking-tight">花蓮莫內花園咖啡農莊</h1>
             <p className="text-gray-500 mb-12">精緻民宿預約體驗</p>
 
             {liffError && (
